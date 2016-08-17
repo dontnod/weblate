@@ -19,6 +19,8 @@
 #
 """Helper methods for views."""
 
+import os
+
 from django.http import HttpResponse, Http404
 from django.shortcuts import get_object_or_404
 import django.utils.translation
@@ -27,6 +29,7 @@ from django.utils.translation import trans_real, ugettext as _
 from weblate.utils import messages
 from weblate.permissions.helpers import check_access
 from weblate.trans.exporters import get_exporter
+from weblate.trans.po_to_xlsx_exporter import get_po_to_xlsx_exporter
 from weblate.trans.models import Project, SubProject, Translation
 
 
@@ -111,7 +114,13 @@ def import_message(request, count, message_none, message_ok):
 
 
 def download_translation_file(translation, fmt=None):
-    if fmt is not None:
+    # It's ugly as hell, but for now I'll handle "Download as Excel workbook" 
+    # very differently from the other (translate-toolkit-based) exports
+    if fmt == 'xlsx':
+        if not translation.store.extension == 'po':
+            raise Http404('Download as Excel workbook is only available when original file is a Gettext PO file!')
+        exporter = get_po_to_xlsx_exporter()
+    elif fmt is not None:
         try:
             exporter = get_exporter(fmt)(translation=translation)
         except KeyError:
@@ -125,21 +134,28 @@ def download_translation_file(translation, fmt=None):
 
     srcfilename = translation.get_filename()
 
+    if fmt == 'xlsx':
+        originalsrcfilename = srcfilename
+        srcfilename = exporter.export(originalsrcfilename)
+
     # Construct file name (do not use real filename as it is usually not
     # that useful)
     filename = '{0}-{1}-{2}.{3}'.format(
         translation.subproject.project.slug,
         translation.subproject.slug,
         translation.language.code,
-        translation.store.extension
+        'xlsx' if fmt == 'xlsx' else translation.store.extension 
     )
 
     # Create response
     with open(srcfilename) as handle:
         response = HttpResponse(
             handle.read(),
-            content_type=translation.store.mimetype
+            content_type = exporter.content_type if fmt == 'xlsx' else translation.store.mimetype
         )
+
+    if fmt == 'xlsx':
+        os.remove(srcfilename)
 
     # Fill in response headers
     response['Content-Disposition'] = 'attachment; filename={0}'.format(
