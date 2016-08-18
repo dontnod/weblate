@@ -23,6 +23,7 @@ from __future__ import unicode_literals
 import os
 import codecs
 from datetime import timedelta
+import tempfile
 
 from django.conf import settings
 from django.db import models
@@ -35,6 +36,8 @@ from django.core.exceptions import ValidationError
 from django.core.cache import cache
 from django.utils import timezone
 from django.core.urlresolvers import reverse
+from django.core.files.storage import default_storage
+from django.core.files.base import ContentFile
 
 from weblate.lang.models import Language
 from weblate.trans.formats import ParseError, try_load
@@ -51,6 +54,7 @@ from weblate.accounts.notifications import notify_new_string
 from weblate.accounts.models import get_author_name
 from weblate.trans.models.change import Change
 from weblate.trans.checklists import TranslationChecklist
+from weblate.trans.po_to_xlsx_exporter import xlsx_to_po
 
 
 class TranslationManager(models.Manager):
@@ -1105,6 +1109,29 @@ class Translation(models.Model, URLMixin, PercentMixin, LoggerMixin):
         # Strip possible UTF-8 BOM
         if filecopy[:3] == codecs.BOM_UTF8:
             filecopy = filecopy[3:]
+
+        # It's ugly as hell, but for now I'll handle "Upload Excel workbook" 
+        # very differently from the other (translate-toolkit-based) uploads
+        fileobj_name_base, fileobj_name_ext = os.path.splitext(fileobj.name)
+        if fileobj_name_ext ==  '.xlsx':
+            if self.store.extension != 'po':
+                raise Exception('Upload Excel workbook is only available when original file is a Gettext PO file!')
+            else:
+                # At this point, filecopy is the memory data for the xlsx file
+                # Save this memory data on disk to be able to invoke easily a xlsx-to-po conversion:
+                temp_xlsx = tempfile.NamedTemporaryFile(suffix='.xlsx', mode='wb+')
+                temp_xlsx.write(filecopy)
+                temp_xlsx.flush()
+                # Conversion occurs on disk
+                temp_po_name = xlsx_to_po(temp_xlsx.name)
+                # Now read the result back into filecopy (and tweak fileobj.name)
+                fileobj.name = temp_po_name
+                temp_po_obj = open(temp_po_name, 'r')
+                filecopy = temp_po_obj.read()
+                # At this point, filecopy is the memory data for the po file,
+                # so we can proceed to the easiest upload code branching (own loader)
+                os.remove(temp_po_name)
+                temp_xlsx.close() # auto remove (it's a tempfile)
 
         # Load backend file
         store = try_load(

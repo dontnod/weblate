@@ -117,7 +117,7 @@ def download_translation_file(translation, fmt=None):
     # It's ugly as hell, but for now I'll handle "Download as Excel workbook" 
     # very differently from the other (translate-toolkit-based) exports
     if fmt == 'xlsx':
-        if not translation.store.extension == 'po':
+        if translation.store.extension != 'po':
             raise Http404('Download as Excel workbook is only available when original file is a Gettext PO file!')
         exporter = get_po_to_xlsx_exporter()
     elif fmt is not None:

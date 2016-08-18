@@ -212,5 +212,118 @@ class PoToXlsxExporter(object):
         for key, value in PoToXlsxExporter.analyze_raw_comment(po_entry.comment).items():
             PoToXlsxExporter.inject_value('[DNE]', key, value, ws, real_i, column_key)
 
+    @staticmethod
+    def parse_workbook(wb, simple_mode):
+        po_data, workbook_reading_instructions = PoToXlsxExporter.init_po(wb)
+        PoToXlsxExporter.read_metadata(po_data, wb, workbook_reading_instructions)
+        PoToXlsxExporter.read_data(po_data, wb, workbook_reading_instructions, simple_mode)
+        if not simple_mode:
+            PoToXlsxExporter.read_obsolete_data(po_data, wb, workbook_reading_instructions)
+        return po_data
+
+    @staticmethod
+    def init_po(wb):
+        po_data = POFile(wrapwidth=-1)
+        workbook_reading_instructions = {}
+        # data sheet
+        if 'data' in wb.sheetnames:
+            workbook_reading_instructions['data'] = {}
+            workbook_reading_instructions['data']['first_data_row'] = 2
+            workbook_reading_instructions['data']['column_key'] = PoToXlsxExporter.read_header_row(wb['data'], 1)
+        # metadata sheet
+        if 'metadata' in wb.sheetnames:
+            workbook_reading_instructions['metadata'] = {}
+            workbook_reading_instructions['metadata']['first_data_row'] = 1
+        # obsolete data sheet (when applicable)
+        if 'obsolete data' in wb.sheetnames:
+            workbook_reading_instructions['obsolete data'] = {}
+            workbook_reading_instructions['obsolete data']['first_data_row'] = 2
+            workbook_reading_instructions['obsolete data']['column_key'] = PoToXlsxExporter.read_header_row(wb['obsolete data'], 1)
+        return po_data, workbook_reading_instructions
+
+    @staticmethod
+    def read_header_row(ws, i):
+        column_key = {}
+        current_column = 1
+        for j in range(1, ws.max_column + 1):
+            column_key[ws.cell(row=i, column=j).value] = j
+        return column_key
+
+    @staticmethod
+    def read_metadata(po_data, wb, workbook_reading_instructions):
+        po_data.metadata = {}
+        if 'metadata' in wb.sheetnames:
+            ws = wb['metadata']
+            for i in range(workbook_reading_instructions[ws.title]['first_data_row'], ws.max_row + 1):
+                po_data.metadata[ws.cell(row=i, column=1).value] = ws.cell(row=i, column=2).value
+
+    @staticmethod
+    def read_any_data(po_data, ws, workbook_reading_instructions, obsolete, simple_mode=False):
+        for i in range(workbook_reading_instructions[ws.title]['first_data_row'], ws.max_row + 1):
+            po_entry = POEntry()
+            column_key = workbook_reading_instructions[ws.title]['column_key']
+            po_entry.msgid = PoToXlsxExporter.read_value(ws, i, 'Source', column_key)
+            po_entry.msgstr = PoToXlsxExporter.read_value(ws, i, 'Translation', column_key)
+            po_entry.msgctxt = PoToXlsxExporter.read_value(ws, i, 'Context', column_key, keep_none=True)
+            po_entry.obsolete = obsolete
+            po_entry.tcomment = PoToXlsxExporter.read_value(ws, i, 'Translator Comment', column_key)
+            flags = PoToXlsxExporter.read_value(ws, i, 'Flags', column_key)
+            if flags:
+                po_entry.flags = flags.split('\n')
+            po_entry.previous_msgid = PoToXlsxExporter.read_value(ws, i, 'Previous Source', column_key)
+            po_entry.previous_msgctxt = PoToXlsxExporter.read_value(ws, i, 'Previous Context', column_key)
+            if not simple_mode:
+                # Typically (upload scenario in Weblate),
+                # (extracted) comments and occurrences are not at all needed in the output file
+                # if said po file is just used for a merge towards a more regular file
+                comment = PoToXlsxExporter.read_value(ws, i, 'Comment', column_key)
+                po_entry.comment = comment # though I'm screwed by the replace('\t', '   ') stuff, is it realy that important?
+                occurrences = PoToXlsxExporter.read_value(ws, i, 'Occurrences', column_key)
+                if occurrences:
+                    occurrences_list = occurrences.split('\n')
+                    for occurrence in occurrences_list:
+                        fpath = occurrence
+                        lineno = ''
+                        occurrence_fpath_lineno = occurrence.split(':')
+                        if len(occurrence_fpath_lineno) == 2 and occurrence_fpath_lineno[1].isdigit():
+                            fpath = occurrence_fpath_lineno[0]
+                            lineno = occurrence_fpath_lineno[1]
+                        po_entry.occurrences.append((fpath, lineno)) 
+                        # NB: some issues remain with colon (:) character in occurrences, but they don't seem critical
+                        # Maybe this colon (:) character in occurrences should be handled differently as early as
+                        # in ManifestToPot so as to not disturb polib
+            # Ignore for now
+            # po_entry.msgid_plural = PoToXlsxExporter.read_value(ws, i, 'Source Plural', column_key)
+            # po_entry.msgstr_plural = PoToXlsxExporter.read_value(ws, i, 'Translation Plural', column_key)
+            # po_entry.previous_msgid_plural = PoToXlsxExporter.read_value(ws, i, 'Previous Source Plural', column_key)
+            # po_entry.linenum = PoToXlsxExporter.read_value(ws, i, 'Line Number', column_key)
+            po_data.append(po_entry)
+
+    @staticmethod
+    def read_value(ws, i, key, column_key, keep_none=False):
+        value = ws.cell(row=i, column=column_key[key]).value
+        if keep_none:
+            return value
+        else:
+            return '' if value is None else value
+
+    @staticmethod
+    def read_data(po_data, wb, workbook_reading_instructions, simple_mode):
+        if 'data' in wb.sheetnames:
+            PoToXlsxExporter.read_any_data(po_data, wb['data'], workbook_reading_instructions, False, simple_mode)
+
+    @staticmethod
+    def read_obsolete_data(po_data, wb, workbook_reading_instructions):
+        if 'obsolete data' in wb.sheetnames:
+            PoToXlsxExporter.read_any_data(po_data, wb['obsolete data'], workbook_reading_instructions, True)
+
 def get_po_to_xlsx_exporter():
     return PoToXlsxExporter()
+
+def xlsx_to_po(xlsx_file):
+    xlsx_file_base, xlsx_file_ext = os.path.splitext(xlsx_file)
+    po_file = xlsx_file_base + '.po'
+    wb = load_workbook(xlsx_file)
+    po_data = PoToXlsxExporter.parse_workbook(wb, True)
+    po_data.save(fpath=po_file)
+    return po_file
