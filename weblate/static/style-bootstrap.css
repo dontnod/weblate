@@ -165,6 +165,9 @@ del {
 .panel-body .table-condensed {
     margin-bottom: 0;
 }
+.panel-body .table-nested {
+    margin-bottom: 10px;
+}
 td .list-group {
     margin-bottom: 0;
 }
@@ -321,4 +324,16 @@ legend {
 }
 .history .list-group-item {
   background-color: inherit;
+}
+.table-breakword {
+    table-layout: fixed;
+    width: 100%;
+}
+.table-breakword > thead > tr > th,
+.table-breakword > tbody > tr > th,
+.table-breakword > tfoot > tr > th,
+.table-breakword > thead > tr > td,
+.table-breakword > tbody > tr > td,
+.table-breakword > tfoot > tr > td {
+  overflow-wrap: break-word;
 }
