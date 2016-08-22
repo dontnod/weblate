@@ -10,7 +10,7 @@
             {% strip_additional_data unit.comment as comment_other %}
             {% split_additional_data unit.comment as comment_additional_data %}
             <div>
-                <table class="table table-bordered table-condensed">
+                <table class="table table-bordered table-condensed table-breakword table-nested">
                     {% for key, value in comment_additional_data %}
                     <tr>
                         <td>{{ key }}</td>
