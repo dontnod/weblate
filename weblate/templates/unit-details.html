@@ -9,12 +9,7 @@
 </tr>
 {% endif %}
 {% if unit.comment %}
-<tr>
-<th>{% trans "Comments" %}</th>
-</tr>
-<tr>
-<td>{{ unit.comment }}</td>
-</tr>
+{% include "unit-comment.html" %}
 {% endif %}
 <tr>
 <th>{% trans "Source string age" %}</th>

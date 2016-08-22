@@ -673,3 +673,21 @@ def user_permissions(user, groups):
             )
         )
     return mark_safe(''.join(result))
+
+# DNE
+
+@register.simple_tag
+def has_additional_data(comment):
+    return '[AdditionalData]' in comment
+
+@register.simple_tag
+def strip_additional_data(comment):
+    return comment[:comment.find('[AdditionalData]')]
+
+@register.simple_tag
+def split_additional_data(comment):
+    result = []
+    for s in comment.split('[AdditionalData]')[1:]:
+        i = s.find(':')
+        result.append((s[:i].strip(), s[i+1:].strip()))
+    return result
