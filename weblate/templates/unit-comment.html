@@ -1,0 +1,27 @@
+{% load i18n %}
+{% load translations %}
+<tr>
+    <th>{% trans "Comments" %}</th>
+</tr>
+<tr>
+    <td>
+        {% has_additional_data unit.comment as comment_has_additional_data %}
+        {% if comment_has_additional_data %}
+            {% strip_additional_data unit.comment as comment_other %}
+            {% split_additional_data unit.comment as comment_additional_data %}
+            <div>
+                <table class="table table-bordered table-condensed">
+                    {% for key, value in comment_additional_data %}
+                    <tr>
+                        <td>{{ key }}</td>
+                        <td>{{ value }}</td>
+                    </tr>
+                    {% endfor %}
+                </table>
+            </div>
+            <div>{{ comment_other }}</div>
+        {% else %}
+            {{ unit.comment }}
+        {% endif %}
+    </td>
+</tr>
