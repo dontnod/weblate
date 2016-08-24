@@ -45,6 +45,14 @@
   </li>
   <li class="dropdown">
     <a class="dropdown-toggle" data-toggle="dropdown" href="#">
+      {% trans "Files" %} <span class="caret"></span>
+    </a>
+    <ul class="dropdown-menu">
+      <li><a href="{% url 'download_all_translations_format' project=object.project.slug subproject=object.slug fmt='xlsx'%}" title="{% trans " Download for an offline translation." %}">{% trans "Download translations (all languages) as Excel workbook" %}</a></li>
+    </ul>
+  </li>
+  <li class="dropdown">
+    <a class="dropdown-toggle" data-toggle="dropdown" href="#">
       {% trans "Tools" %} <span class="caret"></span>
     </a>
     <ul class="dropdown-menu">

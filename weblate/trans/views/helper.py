@@ -178,3 +178,41 @@ def show_form_errors(request, form):
                     'error': error
                 }
             )
+
+
+def download_all_translations_file(translations, fmt=None):
+    # Slightly modified version of download_translation_file
+    # For now it only supports multiple original .po => single .xlsx
+    assert fmt == 'xlsx'
+
+    for translation in translations:
+        if translation.store.extension != 'po':
+            raise Http404('Download as Excel workbook is only available when original file is a Gettext PO file!')
+    exporter = get_po_to_xlsx_exporter()
+
+    originalsrcfilenames = []
+    for translation in translations:
+        originalsrcfilenames.append(translation.get_filename())
+
+    srcfilename = exporter.export_multiple(originalsrcfilenames)
+
+    # Construct file name (do not use real filename as it is usually not
+    # that useful)
+    filename = '{0}-{1}-all.xlsx'.format(
+        translation.subproject.project.slug,
+        translation.subproject.slug
+    )
+
+    # Create response
+    with open(srcfilename) as handle:
+        response = HttpResponse(
+            handle.read(),
+            content_type = exporter.content_type
+        )
+
+    os.remove(srcfilename)
+
+    # Fill in response headers
+    response['Content-Disposition'] = 'attachment; filename=%s' % filename
+
+    return response
