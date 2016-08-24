@@ -36,63 +36,119 @@ class PoToXlsxExporter(object):
     def export(self, po_file):
         po_file_base, po_file_ext = os.path.splitext(po_file)
         xlsx_file = po_file_base + '.xlsx'
-        po_data = pofile(po_file, wrapwidth=-1)
+        po_data = []
+        po_data.append(pofile(po_file, wrapwidth=-1))
+        wb = PoToXlsxExporter.build_workbook(po_data)
+        wb.save(xlsx_file)
+        return xlsx_file
+
+    def export_multiple(self, po_files):
+        for po_file in po_files:
+            po_file_base, po_file_ext = os.path.splitext(po_file)
+            xlsx_file = po_file_base + '.all.xlsx' # yeah I should remove lang in file name but this is only a temp file...
+            break
+        po_data = []
+        for po_file in po_files:
+            po_data.append(pofile(po_file, wrapwidth=-1))
         wb = PoToXlsxExporter.build_workbook(po_data)
         wb.save(xlsx_file)
         return xlsx_file
 
     @staticmethod
+    def sort_by_lang(po_data):
+        if len(po_data) > 1:
+            # It's vital to have English first if present (then the rest can be sorted alphabetically)
+            def _sort_by_lang(po_data_item):
+                lang = PoToXlsxExporter.get_trans_column_title(po_data_item, True)
+                if lang.startswith('en'): 
+                    lang = '#' + lang # puts it first
+                return lang
+            po_data.sort(key = _sort_by_lang)
+
+    @staticmethod
     def build_workbook(po_data):
+        PoToXlsxExporter.sort_by_lang(po_data)
         wb, workbook_writing_instructions = PoToXlsxExporter.init_workbook(po_data)
         PoToXlsxExporter.fill_metadata(po_data, wb['metadata'], workbook_writing_instructions)
         i = 0
-        for po_entry in po_data: 
+        for po_entry in po_data[0]: 
             if not po_entry.obsolete:
-                PoToXlsxExporter.add_po_entry(po_entry, wb['data'], i, workbook_writing_instructions)
+                PoToXlsxExporter.add_po_entry(po_entry, wb['data'], i, workbook_writing_instructions, PoToXlsxExporter.get_trans_column_title(po_data[0], len(po_data) > 1))
                 i += 1
-        i = 0
-        for po_entry in po_data.obsolete_entries(): 
-            PoToXlsxExporter.add_po_entry(po_entry, wb['obsolete data'], i, workbook_writing_instructions)
-            i += 1
+        if len(po_data) > 1:
+            # now for all other languages, there is only one column to fill
+            for i in range(1, len(po_data)):
+                for po_entry in po_data[i]: 
+                    if not po_entry.obsolete:
+                        PoToXlsxExporter.fill_other_trans(po_entry, wb['data'], workbook_writing_instructions, PoToXlsxExporter.get_trans_column_title(po_data[i], len(po_data) > 1))
+        if len(po_data) == 1: # (multiple po: just skip obsolete data for now)
+            i = 0
+            for po_entry in po_data[0].obsolete_entries(): 
+                PoToXlsxExporter.add_po_entry(po_entry, wb['obsolete data'], i, workbook_writing_instructions, PoToXlsxExporter.get_trans_column_title(po_data[0], len(po_data) > 1))
+                i += 1
         PoToXlsxExporter.finalize_workbook(wb)
         return wb
 
     @staticmethod
     def fill_metadata(po_data, ws, workbook_writing_instructions):
+        # NB: when writing a multi-lang xlsx, only keep a few fields
+        fields_multi_lang = ['Project-Id-Version', 'Report-Msgid-Bugs-To', 'POT-Creation-Date']
         i = workbook_writing_instructions[ws.title]['first_data_row']
-        for name, value in po_data.ordered_metadata():
-            ws.cell(row=i, column=1).value = name
-            ws.cell(row=i, column=2).value = value
-            i += 1
+        for name, value in po_data[0].ordered_metadata():
+            if len(po_data) == 1 or name in fields_multi_lang:
+                ws.cell(row=i, column=1).value = name
+                ws.cell(row=i, column=2).value = value
+                i += 1
+
+    @staticmethod
+    def get_trans_column_titles(po_data):
+        trans_column_titles = []
+        for po_data_item in po_data:
+            trans_column_titles.append(PoToXlsxExporter.get_trans_column_title(po_data_item, len(po_data) > 1))
+        return trans_column_titles
+
+    @staticmethod
+    def get_trans_column_title(po_data, multiple_lang):
+        if multiple_lang:
+            for name, value in po_data.ordered_metadata():
+                if name == 'Language':
+                    return value
+        else:
+            return 'Translation'
 
     @staticmethod
     def init_workbook(po_data):
         wb = Workbook()
         workbook_writing_instructions = {}
+        workbook_writing_instructions['data_line_dictionary'] = {}
+        trans_column_titles = PoToXlsxExporter.get_trans_column_titles(po_data)
         # data sheet
         dws = wb.active
         dws.title = 'data'
-        for po_entry in po_data: 
+        for po_entry in po_data[0]: 
             if not po_entry.obsolete:
                 workbook_writing_instructions[dws.title] = {}
                 workbook_writing_instructions[dws.title]['first_data_row'] = 2
-                workbook_writing_instructions[dws.title]['column_key'] = PoToXlsxExporter.write_header_row(dws, 1, po_entry)
-                # assumes all entries are similar in terms of additional data
+                workbook_writing_instructions[dws.title]['column_key'] = PoToXlsxExporter.write_header_row(dws, 1, po_entry, trans_column_titles)
+                # assumes all entries (in all po files) are similar in terms of additional data
                 break
         # metadata sheet
         hws = wb.create_sheet()
         hws.title = 'metadata'
         workbook_writing_instructions[hws.title] = {}
         workbook_writing_instructions[hws.title]['first_data_row'] = 1
-        # obsolete data sheet (when applicable)
-        for po_entry in po_data.obsolete_entries(): 
-            ows = wb.create_sheet()
-            ows.title = 'obsolete data'
-            workbook_writing_instructions[ows.title] = {}
-            workbook_writing_instructions[ows.title]['first_data_row'] = 2
-            workbook_writing_instructions[ows.title]['column_key'] = PoToXlsxExporter.write_header_row(ows, 1, po_entry)
-            # assumes all entries are similar in terms of additional data
-            break
+        # obsolete data sheet (when applicable) 
+        # (multiple po: just skip obsolete data for now, as it's even more unreasonable to assume
+        #  identifcal structure across languages for obsolete data than it is for regular data)
+        if len(po_data) == 1:
+            for po_entry in po_data[0].obsolete_entries(): 
+                ows = wb.create_sheet()
+                ows.title = 'obsolete data'
+                workbook_writing_instructions[ows.title] = {}
+                workbook_writing_instructions[ows.title]['first_data_row'] = 2
+                workbook_writing_instructions[ows.title]['column_key'] = PoToXlsxExporter.write_header_row(ows, 1, po_entry, trans_column_titles)
+                # assumes all entries are similar in terms of additional data
+                break
         return wb, workbook_writing_instructions
 
     @staticmethod
@@ -108,11 +164,11 @@ class PoToXlsxExporter(object):
         return j
 
     @staticmethod
-    def write_header_row(ws, i, po_entry):
+    def write_header_row(ws, i, po_entry, trans_column_titles):
         column_key = {}
         current_column = 1
         # Regular data (classic po): the important ones
-        regular_important_columns = ['Source', 'Translation', 'Context'] # the Holy Trinity
+        regular_important_columns = ['Source'] + trans_column_titles + ['Context']
         current_column = PoToXlsxExporter.write_header_row_part(ws, i, current_column, column_key, '', regular_important_columns)
         # Additional data (DNE data, embedded in comment)
         # (we consider that pretty important so show it before other classic po columns)
@@ -175,13 +231,12 @@ class PoToXlsxExporter(object):
         ws.cell(row=i, column=column_key[prefix_for_column_key + key]).value = value
 
     @staticmethod
-    def add_po_entry(po_entry, ws, i, workbook_writing_instructions):
+    def add_po_entry(po_entry, ws, i, workbook_writing_instructions, trans_column_title):
         def _format_comment(comment):
             return comment.replace('\t', '   ') 
             # as Excel does not like tabs in strings (removes/hides them) and they abound in big raw comments
 
         def _format_flags(flags):
-            #return '\n'.join(str(flag) for flag in flags)
             return '\n'.join(flags)
 
         def _format_occurrence(fpath, lineno):
@@ -196,9 +251,11 @@ class PoToXlsxExporter(object):
         real_i = workbook_writing_instructions[ws.title]['first_data_row'] + i
         column_key = workbook_writing_instructions[ws.title]['column_key']
         PoToXlsxExporter.inject_value('', 'Source', po_entry.msgid, ws, real_i, column_key)
-        PoToXlsxExporter.inject_value('', 'Translation', po_entry.msgstr, ws, real_i, column_key)
+        PoToXlsxExporter.inject_value('', trans_column_title, po_entry.msgstr, ws, real_i, column_key)
         PoToXlsxExporter.inject_value('', 'Context', po_entry.msgctxt, ws, real_i, column_key)
         PoToXlsxExporter.inject_value('', 'Comment', _format_comment(po_entry.comment), ws, real_i, column_key)
+        workbook_writing_instructions['data_line_dictionary'][(po_entry.msgctxt, po_entry.comment)] = real_i 
+        # NB: for the above dictionary, it would be better to extract key(s) from comment than to use the whole comment
         PoToXlsxExporter.inject_value('', 'Translator Comment', po_entry.tcomment, ws, real_i, column_key)
         PoToXlsxExporter.inject_value('', 'Occurrences', _format_occurrences(po_entry.occurrences), ws, real_i, column_key)
         PoToXlsxExporter.inject_value('', 'Flags', _format_flags(po_entry.flags), ws, real_i, column_key)
@@ -211,6 +268,12 @@ class PoToXlsxExporter(object):
         # PoToXlsxExporter.inject_value('', 'Line Number', po_entry.linenum, ws, real_i, column_key)
         for key, value in PoToXlsxExporter.analyze_raw_comment(po_entry.comment).items():
             PoToXlsxExporter.inject_value('[DNE]', key, value, ws, real_i, column_key)
+
+    @staticmethod
+    def fill_other_trans(po_entry, ws, workbook_writing_instructions, trans_column_title):
+        column_key = workbook_writing_instructions[ws.title]['column_key']
+        real_i = workbook_writing_instructions['data_line_dictionary'][(po_entry.msgctxt, po_entry.comment)]
+        PoToXlsxExporter.inject_value('', trans_column_title, po_entry.msgstr, ws, real_i, column_key)
 
     @staticmethod
     def parse_workbook(wb, simple_mode):

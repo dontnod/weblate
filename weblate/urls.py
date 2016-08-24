@@ -180,6 +180,11 @@ urlpatterns = [
         weblate.trans.views.source.edit_check_flags,
         name='edit_check_flags'
     ),
+    url(
+        r'^download-translations/' + SUBPROJECT + '(?P<fmt>[a-z0-9]+)/$',
+        weblate.trans.views.files.download_all_translations_format,
+        name='download_all_translations_format',
+    ),
 
     # Translation pages
     url(
