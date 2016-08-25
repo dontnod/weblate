@@ -37,6 +37,7 @@ from translate.storage.csvl10n import csvfile
 import weblate
 from weblate.trans.formats import FileFormat
 from weblate.trans.site import get_site_url
+from weblate.trans.po_to_xlsx_exporter import PoToXlsxExporter
 
 if six.PY2:
     _CHARMAP2 = string.maketrans('', '')[:32]
@@ -283,3 +284,25 @@ class CSVExporter(BaseExporter):
         if text and text[0] in ('=', '+', '-', '@', '|', '%'):
             return "'{0}'".format(text.replace('|', '\\|'))
         return text
+
+
+@register_exporter
+class XlsxExporter(object):
+    name = 'xlsx'
+    content_type = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    extension = 'xlsx'
+    has_lang = False
+
+    # Not a regular, get_storage-based exporter
+    # Can only export po into xlsx
+    # But registered nevertheless for convenience
+    # Logic is in a specific file (po_to_xlsx_exporter)
+    
+    def get_storage(self):
+        raise NotImplementedError()
+
+    def export(self, po_file):
+        return PoToXlsxExporter.export(po_file)
+
+    def export_multiple(self, po_files):
+        return PoToXlsxExporter.export_multiple(po_files)

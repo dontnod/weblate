@@ -29,7 +29,6 @@ from django.utils.translation import trans_real, ugettext as _
 from weblate.utils import messages
 from weblate.permissions.helpers import check_access
 from weblate.trans.exporters import get_exporter
-from weblate.trans.po_to_xlsx_exporter import get_po_to_xlsx_exporter
 from weblate.trans.models import Project, SubProject, Translation
 
 
@@ -119,18 +118,21 @@ def download_translation_file(translation, fmt=None):
     if fmt == 'xlsx':
         if translation.store.extension != 'po':
             raise Http404('Download as Excel workbook is only available when original file is a Gettext PO file!')
-        exporter = get_po_to_xlsx_exporter()
-    elif fmt is not None:
+    if fmt is not None:
         try:
-            exporter = get_exporter(fmt)(translation=translation)
+            if fmt == 'xlsx':
+                exporter = get_exporter(fmt)()
+            else:
+                exporter = get_exporter(fmt)(translation=translation)
         except KeyError:
             raise Http404('File format not supported')
-        exporter.add_units(translation)
-        return exporter.get_response(
-            '{{project}}-{0}-{{language}}.{{extension}}'.format(
-                translation.subproject.slug
+        if fmt != 'xlsx':
+            exporter.add_units(translation)
+            return exporter.get_response(
+                '{{project}}-{0}-{{language}}.{{extension}}'.format(
+                    translation.subproject.slug
+                )
             )
-        )
 
     srcfilename = translation.get_filename()
 
@@ -188,7 +190,7 @@ def download_all_translations_file(translations, fmt=None):
     for translation in translations:
         if translation.store.extension != 'po':
             raise Http404('Download as Excel workbook is only available when original file is a Gettext PO file!')
-    exporter = get_po_to_xlsx_exporter()
+    exporter = get_exporter(fmt)()
 
     originalsrcfilenames = []
     for translation in translations:
