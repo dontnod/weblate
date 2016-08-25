@@ -32,7 +32,7 @@ from weblate.utils import messages
 from weblate.utils.errors import report_error
 from weblate.trans.forms import get_upload_form
 from weblate.trans.views.helper import (
-    get_project, get_translation, download_translation_file, download_all_translations_file, show_form_errors,
+    get_subproject, get_translation, download_translation_file, download_all_translations_file, show_form_errors,
 )
 from weblate.permissions.helpers import (
     can_author_translation, can_overwrite_translation,
@@ -47,11 +47,9 @@ def download_translation_format(request, project, subproject, lang, fmt):
 
 
 def download_all_translations_format(request, project, subproject, fmt):
-    objs = []
-    for lang in get_project(request, project).get_languages():
-        objs.append(get_translation(request, project, subproject, lang.code))
+    obj = get_subproject(request, project, subproject)
 
-    return download_all_translations_file(objs, fmt)
+    return download_all_translations_file(obj.translation_set.all(), fmt)
 
 
 def download_translation(request, project, subproject, lang):
