@@ -29,11 +29,12 @@ from openpyxl.styles import *
 from openpyxl.utils import *
 
 class PoToXlsxExporter(object):
-    name = 'xlsx'
-    content_type = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-    extension = 'xlsx'
+    
+    # It's a bit artificial to have all this as a class, but it's more convenient, 
+    # until we solve the horrible issue that the below is largely copy/pasted from nimp localization...
 
-    def export(self, po_file):
+    @staticmethod
+    def export(po_file):
         po_file_base, po_file_ext = os.path.splitext(po_file)
         xlsx_file = po_file_base + '.xlsx'
         po_data = []
@@ -42,7 +43,8 @@ class PoToXlsxExporter(object):
         wb.save(xlsx_file)
         return xlsx_file
 
-    def export_multiple(self, po_files):
+    @staticmethod
+    def export_multiple(po_files):
         for po_file in po_files:
             po_file_base, po_file_ext = os.path.splitext(po_file)
             xlsx_file = po_file_base + '.all.xlsx' # yeah I should remove lang in file name but this is only a temp file...
@@ -379,9 +381,6 @@ class PoToXlsxExporter(object):
     def read_obsolete_data(po_data, wb, workbook_reading_instructions):
         if 'obsolete data' in wb.sheetnames:
             PoToXlsxExporter.read_any_data(po_data, wb['obsolete data'], workbook_reading_instructions, True)
-
-def get_po_to_xlsx_exporter():
-    return PoToXlsxExporter()
 
 def xlsx_to_po(xlsx_file):
     xlsx_file_base, xlsx_file_ext = os.path.splitext(xlsx_file)
