@@ -283,11 +283,11 @@ class PoToXlsxExporter(object):
     @staticmethod
     def parse_workbook(wb, simple_mode):
         po_data, workbook_reading_instructions = PoToXlsxExporter.init_po(wb)
-        PoToXlsxExporter.read_metadata(po_data, wb, workbook_reading_instructions)
+        repo_old_revision = PoToXlsxExporter.read_metadata(po_data, wb, workbook_reading_instructions)
         PoToXlsxExporter.read_data(po_data, wb, workbook_reading_instructions, simple_mode)
         if not simple_mode:
             PoToXlsxExporter.read_obsolete_data(po_data, wb, workbook_reading_instructions)
-        return po_data
+        return po_data, repo_old_revision
 
     @staticmethod
     def init_po(wb):
@@ -325,8 +325,11 @@ class PoToXlsxExporter(object):
             for i in range(workbook_reading_instructions[ws.title]['first_data_row'], ws.max_row + 1):
                 name = ws.cell(row=i, column=1).value
                 value = ws.cell(row=i, column=2).value
-                if name != 'repo_last_revision':
+                if name == 'repo_last_revision':
+                    repo_old_revision = value
+                else:
                     po_data.metadata[name] = value
+            return repo_old_revision
 
     @staticmethod
     def read_any_data(po_data, ws, workbook_reading_instructions, obsolete, simple_mode=False):
@@ -392,6 +395,6 @@ def xlsx_to_po(xlsx_file):
     xlsx_file_base, xlsx_file_ext = os.path.splitext(xlsx_file)
     po_file = xlsx_file_base + '.po'
     wb = load_workbook(xlsx_file)
-    po_data = PoToXlsxExporter.parse_workbook(wb, True)
+    po_data, repo_old_revision = PoToXlsxExporter.parse_workbook(wb, True)
     po_data.save(fpath=po_file)
-    return po_file
+    return po_file, repo_old_revision

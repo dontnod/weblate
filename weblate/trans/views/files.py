@@ -120,6 +120,7 @@ def upload_translation(request, project, subproject, lang):
             merge_header=form.cleaned_data['merge_header'],
             method=form.cleaned_data['method'],
             fuzzy=form.cleaned_data['fuzzy'],
+            diff_past=form.cleaned_data['diff_past'],
         )
         if total == 0:
             message = _('No strings were imported from the uploaded file.')

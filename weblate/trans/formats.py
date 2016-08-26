@@ -770,7 +770,7 @@ class FileFormat(object):
         with open(filename, 'w') as output:
             output.write(cls.new_translation)
 
-    def iterate_merge(self, fuzzy):
+    def iterate_merge(self, fuzzy, old_store=None):
         """Iterate over units for merging.
 
         Note: This can change fuzzy state of units!
@@ -793,6 +793,12 @@ class FileFormat(object):
                 unit.mark_fuzzy(False)
                 if fuzzy != 'approve':
                     set_fuzzy = True
+
+            # Skip when translation unchanged w/r/t old store
+            if old_store is not None:
+                old_unit, dummy = old_store.find_unit(unit.unit.getcontext(), unit.unit.source) 
+                if old_unit is not None and old_unit.unit.target == unit.unit.target:
+                    continue
 
             yield set_fuzzy, unit
 
