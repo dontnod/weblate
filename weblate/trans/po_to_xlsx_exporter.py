@@ -34,17 +34,17 @@ class PoToXlsxExporter(object):
     # until we solve the horrible issue that the below is largely copy/pasted from nimp localization...
 
     @staticmethod
-    def export(po_file):
+    def export(po_file, repo_last_revision):
         po_file_base, po_file_ext = os.path.splitext(po_file)
         xlsx_file = po_file_base + '.xlsx'
         po_data = []
         po_data.append(pofile(po_file, wrapwidth=-1))
-        wb = PoToXlsxExporter.build_workbook(po_data)
+        wb = PoToXlsxExporter.build_workbook(po_data, repo_last_revision)
         wb.save(xlsx_file)
         return xlsx_file
 
     @staticmethod
-    def export_multiple(po_files):
+    def export_multiple(po_files, repo_last_revision):
         for po_file in po_files:
             po_file_base, po_file_ext = os.path.splitext(po_file)
             xlsx_file = po_file_base + '.all.xlsx' # yeah I should remove lang in file name but this is only a temp file...
@@ -52,7 +52,7 @@ class PoToXlsxExporter(object):
         po_data = []
         for po_file in po_files:
             po_data.append(pofile(po_file, wrapwidth=-1))
-        wb = PoToXlsxExporter.build_workbook(po_data)
+        wb = PoToXlsxExporter.build_workbook(po_data, repo_last_revision)
         wb.save(xlsx_file)
         return xlsx_file
 
@@ -68,9 +68,9 @@ class PoToXlsxExporter(object):
             po_data.sort(key = _sort_by_lang)
 
     @staticmethod
-    def build_workbook(po_data):
+    def build_workbook(po_data, repo_last_revision=None):
         PoToXlsxExporter.sort_by_lang(po_data)
-        wb, workbook_writing_instructions = PoToXlsxExporter.init_workbook(po_data)
+        wb, workbook_writing_instructions = PoToXlsxExporter.init_workbook(po_data, repo_last_revision)
         PoToXlsxExporter.fill_metadata(po_data, wb['metadata'], workbook_writing_instructions)
         i = 0
         for po_entry in po_data[0]: 
@@ -101,6 +101,8 @@ class PoToXlsxExporter(object):
                 ws.cell(row=i, column=1).value = name
                 ws.cell(row=i, column=2).value = value
                 i += 1
+        ws.cell(row=i, column=1).value = 'repo_last_revision'
+        ws.cell(row=i, column=2).value = workbook_writing_instructions['repo_last_revision']
 
     @staticmethod
     def get_trans_column_titles(po_data):
@@ -119,9 +121,10 @@ class PoToXlsxExporter(object):
             return 'Translation'
 
     @staticmethod
-    def init_workbook(po_data):
+    def init_workbook(po_data, repo_last_revision=None):
         wb = Workbook()
         workbook_writing_instructions = {}
+        workbook_writing_instructions['repo_last_revision'] = repo_last_revision
         workbook_writing_instructions['data_line_dictionary'] = {}
         trans_column_titles = PoToXlsxExporter.get_trans_column_titles(po_data)
         # data sheet
@@ -320,7 +323,10 @@ class PoToXlsxExporter(object):
         if 'metadata' in wb.sheetnames:
             ws = wb['metadata']
             for i in range(workbook_reading_instructions[ws.title]['first_data_row'], ws.max_row + 1):
-                po_data.metadata[ws.cell(row=i, column=1).value] = ws.cell(row=i, column=2).value
+                name = ws.cell(row=i, column=1).value
+                value = ws.cell(row=i, column=2).value
+                if name != 'repo_last_revision':
+                    po_data.metadata[name] = value
 
     @staticmethod
     def read_any_data(po_data, ws, workbook_reading_instructions, obsolete, simple_mode=False):

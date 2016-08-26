@@ -138,7 +138,7 @@ def download_translation_file(translation, fmt=None):
 
     if fmt == 'xlsx':
         originalsrcfilename = srcfilename
-        srcfilename = exporter.export(originalsrcfilename)
+        srcfilename = exporter.export(originalsrcfilename, translation.get_last_local_commit(commit_pending=True))
 
     # Construct file name (do not use real filename as it is usually not
     # that useful)
@@ -188,6 +188,11 @@ def download_all_translations_file(translations, fmt=None):
     assert fmt == 'xlsx'
 
     for translation in translations:
+        subproject = translation.subproject 
+        # should be the same for all translations!
+        break
+
+    for translation in translations:
         if translation.store.extension != 'po':
             raise Http404('Download as Excel workbook is only available when original file is a Gettext PO file!')
     exporter = get_exporter(fmt)()
@@ -196,7 +201,7 @@ def download_all_translations_file(translations, fmt=None):
     for translation in translations:
         originalsrcfilenames.append(translation.get_filename())
 
-    srcfilename = exporter.export_multiple(originalsrcfilenames)
+    srcfilename = exporter.export_multiple(originalsrcfilenames, subproject.get_last_local_commit(commit_pending=True))
 
     # Construct file name (do not use real filename as it is usually not
     # that useful)
