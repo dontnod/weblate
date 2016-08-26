@@ -301,8 +301,8 @@ class XlsxExporter(object):
     def get_storage(self):
         raise NotImplementedError()
 
-    def export(self, po_file):
-        return PoToXlsxExporter.export(po_file)
+    def export(self, po_file, repo_last_revision):
+        return PoToXlsxExporter.export(po_file, repo_last_revision)
 
-    def export_multiple(self, po_files):
-        return PoToXlsxExporter.export_multiple(po_files)
+    def export_multiple(self, po_files, repo_last_revision):
+        return PoToXlsxExporter.export_multiple(po_files, repo_last_revision)
