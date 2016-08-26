@@ -1017,7 +1017,7 @@ class Translation(models.Model, URLMixin, PercentMixin, LoggerMixin):
         return result
 
     def merge_translations(self, request, store2, overwrite, add_fuzzy,
-                           fuzzy, merge_header):
+                           fuzzy, merge_header, old_store=None):
         """Merge translation unit wise
 
         Needed for template based translations to add new strings.
@@ -1031,7 +1031,7 @@ class Translation(models.Model, URLMixin, PercentMixin, LoggerMixin):
         # Commit possible prior changes
         self.commit_pending(request, author)
 
-        for set_fuzzy, unit2 in store2.iterate_merge(fuzzy):
+        for set_fuzzy, unit2 in store2.iterate_merge(fuzzy, old_store):
             try:
                 unit = self.unit_set.get_unit(unit2)
             except Unit.DoesNotExist:
@@ -1073,13 +1073,13 @@ class Translation(models.Model, URLMixin, PercentMixin, LoggerMixin):
 
         return (not_found, skipped, accepted, store2.count_units())
 
-    def merge_suggestions(self, request, store, fuzzy):
+    def merge_suggestions(self, request, store, fuzzy, old_store=None):
         """Merge content of translate-toolkit store as a suggestions."""
         not_found = 0
         skipped = 0
         accepted = 0
 
-        for dummy, unit in store.iterate_merge(fuzzy):
+        for dummy, unit in store.iterate_merge(fuzzy, old_store):
             # Grab database unit
             try:
                 dbunit = self.unit_set.get_unit(unit)
@@ -1101,7 +1101,7 @@ class Translation(models.Model, URLMixin, PercentMixin, LoggerMixin):
         return (not_found, skipped, accepted, store.count_units())
 
     def merge_upload(self, request, fileobj, overwrite, author=None,
-                     merge_header=True, method='translate', fuzzy=''):
+                     merge_header=True, method='translate', fuzzy='', diff_past=True):
         """Top level handler for file uploads."""
         filecopy = fileobj.read()
         fileobj.close()
@@ -1123,7 +1123,7 @@ class Translation(models.Model, URLMixin, PercentMixin, LoggerMixin):
                 temp_xlsx.write(filecopy)
                 temp_xlsx.flush()
                 # Conversion occurs on disk
-                temp_po_name = xlsx_to_po(temp_xlsx.name)
+                temp_po_name, repo_old_revision = xlsx_to_po(temp_xlsx.name)
                 # Now read the result back into filecopy (and tweak fileobj.name)
                 fileobj.name = temp_po_name
                 temp_po_obj = open(temp_po_name, 'r')
@@ -1152,6 +1152,17 @@ class Translation(models.Model, URLMixin, PercentMixin, LoggerMixin):
                     not self.language.same_plural(header['Plural-Forms']):
                 raise Exception('Plural forms do not match the language.')
 
+        old_store = None
+        if diff_past and fileobj_name_ext ==  '.xlsx' and repo_old_revision is not None:
+            # Load old version of the store:
+            old_filecopy = self.subproject.repository.retrieve_revision(repo_old_revision, self.filename).encode('utf-8')
+            old_store = try_load(
+                fileobj.name,
+                old_filecopy,
+                self.subproject.file_format_cls,
+                self.subproject.template_store
+            )
+
         if method in ('translate', 'fuzzy'):
             # Merge on units level
             with self.subproject.repository.lock:
@@ -1162,10 +1173,11 @@ class Translation(models.Model, URLMixin, PercentMixin, LoggerMixin):
                     (method == 'fuzzy'),
                     fuzzy,
                     merge_header,
+                    old_store=old_store
                 )
 
         # Add as sugestions
-        return self.merge_suggestions(request, store, fuzzy)
+        return self.merge_suggestions(request, store, fuzzy, old_store=old_store)
 
     def invalidate_cache(self, cache_type=None):
         """Invalidate any cached stats."""

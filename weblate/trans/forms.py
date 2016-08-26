@@ -472,6 +472,12 @@ class SimpleUploadForm(forms.Form):
         required=False,
         initial=True,
     )
+    diff_past = forms.BooleanField(
+        label=_('Ignore unchanged since download'),
+        help_text=_('(Excel down/upload only) When checked, any translation not changed during offline work will be ignored.'),
+        required=False,
+        initial=True,
+    )
 
     def remove_translation_choice(self, value):
         """Remove add as translation choice."""
