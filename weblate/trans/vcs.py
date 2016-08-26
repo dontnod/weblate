@@ -362,6 +362,12 @@ class Repository(object):
             return None
         return merge_driver
 
+    def retrieve_revision(revision, filename):
+        """
+        Retrieves data for a specific revision of a file (does not affect current file on disk)
+        """
+        raise NotImplementedError()
+
 
 @register_vcs
 class GitRepository(Repository):
@@ -624,6 +630,12 @@ class GitRepository(Repository):
             ['describe', '--always'],
             needs_lock=False
         ).strip()
+
+    def retrieve_revision(self, revision, filename):
+        """
+        Retrieves data for a specific revision of a file (does not affect current file on disk)
+        """
+        return self.execute(['show', '%s:%s' % (revision, filename)], needs_lock=False)
 
     @classmethod
     def global_setup(cls):
