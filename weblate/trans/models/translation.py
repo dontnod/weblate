@@ -628,6 +628,13 @@ class Translation(models.Model, URLMixin, PercentMixin, LoggerMixin):
             return None
         return self.last_change_obj.timestamp
 
+    def get_last_local_commit(self, commit_pending=False):
+        """Returns latest local commit."""
+        if commit_pending and self.repo_needs_commit():
+            self.commit_pending(None)
+        result = self.subproject.repository.last_revision
+        return result
+
     def commit_pending(self, request, author=None, skip_push=False):
         """Commit any pending changes."""
         # Get author of last changes
