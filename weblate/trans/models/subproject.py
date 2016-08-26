@@ -622,6 +622,13 @@ class SubProject(models.Model, PercentMixin, URLMixin, PathMixin):
             cache.set(cache_key, result)
         return result
 
+    def get_last_local_commit(self, commit_pending=False):
+        """Returns latest local commit."""
+        if commit_pending and self.repo_needs_commit():
+            self.commit_pending(None)
+        result = self.repository.last_revision
+        return result
+
     @perform_on_link
     def get_repo_url(self):
         """Return link to repository."""
