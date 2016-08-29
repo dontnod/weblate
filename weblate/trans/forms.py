@@ -470,7 +470,7 @@ class SimpleUploadForm(forms.Form):
         label=_('Merge file header'),
         help_text=_('Merges content of file header into the translation.'),
         required=False,
-        initial=True,
+        initial=False,
     )
     diff_past = forms.BooleanField(
         label=_('Ignore unchanged since download'),
