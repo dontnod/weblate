@@ -25,6 +25,8 @@ import codecs
 from datetime import timedelta
 import tempfile
 
+from polib import *
+
 from django.conf import settings
 from django.db import models
 from django.contrib.auth.models import User
@@ -54,7 +56,7 @@ from weblate.accounts.notifications import notify_new_string
 from weblate.accounts.models import get_author_name
 from weblate.trans.models.change import Change
 from weblate.trans.checklists import TranslationChecklist
-from weblate.trans.po_to_xlsx_exporter import xlsx_to_po
+from weblate.trans.po_to_xlsx_exporter import xlsx_to_po, PoToXlsxExporter
 
 
 class TranslationManager(models.Manager):
@@ -1100,6 +1102,16 @@ class Translation(models.Model, URLMixin, PercentMixin, LoggerMixin):
 
         return (not_found, skipped, accepted, store.count_units())
 
+    def get_language_code_as_in_original_po_file(self):
+        if self.store.extension != 'po':
+            # fall back on more standard language.code
+            return self.language.code
+            # (or I also could have:
+            # raise Exception('Upload Excel workbook is only available when original file is a Gettext PO file!')
+        else:
+            po_data = pofile(self.get_filename(), wrapwidth=-1)
+            return PoToXlsxExporter.get_trans_column_title(po_data, True)
+    
     def merge_upload(self, request, fileobj, overwrite, author=None,
                      merge_header=True, method='translate', fuzzy='', diff_past=True):
         """Top level handler for file uploads."""
@@ -1123,7 +1135,11 @@ class Translation(models.Model, URLMixin, PercentMixin, LoggerMixin):
                 temp_xlsx.write(filecopy)
                 temp_xlsx.flush()
                 # Conversion occurs on disk
-                temp_po_name, repo_old_revision = xlsx_to_po(temp_xlsx.name)
+                alt_translation_column_name = self.get_language_code_as_in_original_po_file()
+                # The above is for the case multi-lang. download => (single-lang.) upload: don't look for translations 
+                # in column named Translation but rather named with the specific language code
+                # i.e. not self.language.code but rather the content of 'Language' metadata in the original .po
+                temp_po_name, repo_old_revision = xlsx_to_po(temp_xlsx.name, alt_translation_column_name)
                 # Now read the result back into filecopy (and tweak fileobj.name)
                 fileobj.name = temp_po_name
                 temp_po_obj = open(temp_po_name, 'r')
