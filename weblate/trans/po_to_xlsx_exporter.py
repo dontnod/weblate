@@ -281,8 +281,8 @@ class PoToXlsxExporter(object):
         PoToXlsxExporter.inject_value('', trans_column_title, po_entry.msgstr, ws, real_i, column_key)
 
     @staticmethod
-    def parse_workbook(wb, simple_mode):
-        po_data, workbook_reading_instructions = PoToXlsxExporter.init_po(wb)
+    def parse_workbook(wb, simple_mode, alt_translation_column_name=None):
+        po_data, workbook_reading_instructions = PoToXlsxExporter.init_po(wb, alt_translation_column_name)
         repo_old_revision = PoToXlsxExporter.read_metadata(po_data, wb, workbook_reading_instructions)
         PoToXlsxExporter.read_data(po_data, wb, workbook_reading_instructions, simple_mode)
         if not simple_mode:
@@ -290,23 +290,28 @@ class PoToXlsxExporter(object):
         return po_data, repo_old_revision
 
     @staticmethod
-    def init_po(wb):
+    def init_po_using_sheet(wb, sheetname, header_row, first_data_row, workbook_reading_instructions, alt_translation_column_name=None):
+        if sheetname in wb.sheetnames:
+            workbook_reading_instructions[sheetname] = {}
+            workbook_reading_instructions[sheetname]['first_data_row'] = first_data_row
+            workbook_reading_instructions[sheetname]['column_key'] = PoToXlsxExporter.read_header_row(wb[sheetname], header_row)
+            if (alt_translation_column_name is not None 
+                and 'Translation' not in workbook_reading_instructions[sheetname]['column_key'] 
+                and alt_translation_column_name in workbook_reading_instructions[sheetname]['column_key']):
+                workbook_reading_instructions[sheetname]['column_key']['Translation'] = workbook_reading_instructions[sheetname]['column_key'][alt_translation_column_name]
+
+    @staticmethod
+    def init_po(wb, alt_translation_column_name=None):
         po_data = POFile(wrapwidth=-1)
         workbook_reading_instructions = {}
         # data sheet
-        if 'data' in wb.sheetnames:
-            workbook_reading_instructions['data'] = {}
-            workbook_reading_instructions['data']['first_data_row'] = 2
-            workbook_reading_instructions['data']['column_key'] = PoToXlsxExporter.read_header_row(wb['data'], 1)
+        PoToXlsxExporter.init_po_using_sheet(wb, 'data', 1, 2, workbook_reading_instructions, alt_translation_column_name)
         # metadata sheet
         if 'metadata' in wb.sheetnames:
             workbook_reading_instructions['metadata'] = {}
             workbook_reading_instructions['metadata']['first_data_row'] = 1
         # obsolete data sheet (when applicable)
-        if 'obsolete data' in wb.sheetnames:
-            workbook_reading_instructions['obsolete data'] = {}
-            workbook_reading_instructions['obsolete data']['first_data_row'] = 2
-            workbook_reading_instructions['obsolete data']['column_key'] = PoToXlsxExporter.read_header_row(wb['obsolete data'], 1)
+        PoToXlsxExporter.init_po_using_sheet(wb, 'obsolete data', 1, 2, workbook_reading_instructions, alt_translation_column_name)
         return po_data, workbook_reading_instructions
 
     @staticmethod
@@ -391,10 +396,10 @@ class PoToXlsxExporter(object):
         if 'obsolete data' in wb.sheetnames:
             PoToXlsxExporter.read_any_data(po_data, wb['obsolete data'], workbook_reading_instructions, True)
 
-def xlsx_to_po(xlsx_file):
+def xlsx_to_po(xlsx_file, alt_translation_column_name=None):
     xlsx_file_base, xlsx_file_ext = os.path.splitext(xlsx_file)
     po_file = xlsx_file_base + '.po'
     wb = load_workbook(xlsx_file)
-    po_data, repo_old_revision = PoToXlsxExporter.parse_workbook(wb, True)
+    po_data, repo_old_revision = PoToXlsxExporter.parse_workbook(wb, True, alt_translation_column_name)
     po_data.save(fpath=po_file)
     return po_file, repo_old_revision
