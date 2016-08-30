@@ -194,12 +194,12 @@ class PoToXlsxExporter(object):
     @staticmethod
     def analyze_raw_comment(comment):
         dict = {}
-        # Empty additional data (trailing \t seems to kinda disappear at some point in that case, so...):
-        p = re.compile(r'^\[AdditionalData\] (?P<key>[^:]*):$', re.MULTILINE)
+        # Empty additional data (trailing space seems to kinda disappear at some point in that case, so...):
+        p = re.compile(r'^\[AdditionalData\] (?P<key>[^:]*):( ?)$', re.MULTILINE)
         for m in re.finditer(p, comment):
             dict[m.group('key')] = None
         # Additional data with a value:
-        p = re.compile(r'^\[AdditionalData\] (?P<key>[^:]*):\t(?P<value>[^\n]*)$', re.MULTILINE)
+        p = re.compile(r'^\[AdditionalData\] (?P<key>[^:]*): (?P<value>[^\n]+)$', re.MULTILINE)
         for m in re.finditer(p, comment):
             dict[m.group('key')] = m.group('value')
         return dict
@@ -237,10 +237,6 @@ class PoToXlsxExporter(object):
 
     @staticmethod
     def add_po_entry(po_entry, ws, i, workbook_writing_instructions, trans_column_title):
-        def _format_comment(comment):
-            return comment.replace('\t', '   ') 
-            # as Excel does not like tabs in strings (removes/hides them) and they abound in big raw comments
-
         def _format_flags(flags):
             return '\n'.join(flags)
 
@@ -258,7 +254,7 @@ class PoToXlsxExporter(object):
         PoToXlsxExporter.inject_value('', 'Source', po_entry.msgid, ws, real_i, column_key)
         PoToXlsxExporter.inject_value('', trans_column_title, po_entry.msgstr, ws, real_i, column_key)
         PoToXlsxExporter.inject_value('', 'Context', po_entry.msgctxt, ws, real_i, column_key)
-        PoToXlsxExporter.inject_value('', 'Comment', _format_comment(po_entry.comment), ws, real_i, column_key)
+        PoToXlsxExporter.inject_value('', 'Comment', po_entry.comment, ws, real_i, column_key)
         workbook_writing_instructions['data_line_dictionary'][(po_entry.msgctxt, po_entry.comment)] = real_i 
         # NB: for the above dictionary, it would be better to extract key(s) from comment than to use the whole comment
         PoToXlsxExporter.inject_value('', 'Translator Comment', po_entry.tcomment, ws, real_i, column_key)
@@ -356,7 +352,7 @@ class PoToXlsxExporter(object):
                 # (extracted) comments and occurrences are not at all needed in the output file
                 # if said po file is just used for a merge towards a more regular file
                 comment = PoToXlsxExporter.read_value(ws, i, 'Comment', column_key)
-                po_entry.comment = comment # though I'm screwed by the replace('\t', '   ') stuff, is it realy that important?
+                po_entry.comment = comment
                 occurrences = PoToXlsxExporter.read_value(ws, i, 'Occurrences', column_key)
                 if occurrences:
                     occurrences_list = occurrences.split('\n')
