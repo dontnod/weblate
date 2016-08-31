@@ -209,6 +209,7 @@ For example you can enable only few of them:
 
     CHECK_LIST = (
         'weblate.trans.checks.same.SameCheck',
+		'weblate.trans.checks.same.InvariantCheck',
         'weblate.trans.checks.chars.BeginNewlineCheck',
         'weblate.trans.checks.chars.EndNewlineCheck',
         'weblate.trans.checks.chars.BeginSpaceCheck',

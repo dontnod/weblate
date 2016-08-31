@@ -135,6 +135,15 @@ class SameCheck(TargetCheck):
     description = _('Source and translated strings are same')
     severity = 'warning'
 
+    def should_skip(self, unit):
+        """Check whether we should skip processing this unit"""
+        if super(SameCheck, self).should_skip(unit):
+            return True
+        # Additional skip case: when InvariantCheck (antinomic with SameCheck) is activated
+        if InvariantCheck().enable_string in unit.all_flags:
+            return True
+        return False
+
     def should_ignore(self, source, unit):
         """Check whether given unit should be ignored."""
         # Ignore some docbook tags
@@ -199,3 +208,17 @@ class SameCheck(TargetCheck):
             return False
 
         return source == target
+
+
+class InvariantCheck(TargetCheck):
+    '''
+    Check for invariant entries that actually do differ in translation.
+    '''
+    check_id = 'invariant'
+    name = _('Translation invariant')
+    description = _('Translation is not identical to source')
+    severity = 'danger'
+    default_disabled = True
+
+    def check_single(self, source, target, unit):
+        return source != target
