@@ -25,6 +25,9 @@ import django.contrib.sitemaps.views
 import django.views.i18n
 import django.views.static
 
+import ptvsd
+import socket
+
 from weblate.trans.feeds import (
     TranslationChangesFeed, SubProjectChangesFeed,
     ProjectChangesFeed, ChangesFeed, LanguageChangesFeed
@@ -1044,3 +1047,18 @@ if settings.DEBUG and 'debug_toolbar' in settings.INSTALLED_APPS:
     urlpatterns += [
         url(r'^__debug__/', include(debug_toolbar.urls)),
     ]
+
+# This is probably as good a place as any other to try enable remote debugging
+if settings.DEBUG:
+    try:
+        ptvsd.enable_attach(secret='weblate_remote_debugging')
+    except ptvsd.AttachAlreadyEnabledError:
+        # I have no clue about processes on Weblate side but I know this try..except
+        # is needed, as suggested in ptvsd notes
+        pass
+    except socket.error:
+        # even in that case, ignore error (though it might mean I'll stay attached to a process
+        # that is not necessarily the one I want...)
+        pass
+    # ptvsd.wait_for_attach(timeout=30)
+    # ptvsd.break_into_debugger()
