@@ -451,11 +451,13 @@ class Translation(models.Model, URLMixin, PercentMixin, LoggerMixin):
         # Position of current unit
         pos = 1
 
+        history_objs = []
+
         for unit in self.store.all_units():
             if not unit.is_translatable():
                 continue
 
-            newunit, is_new = Unit.objects.update_from_unit(
+            newunit, is_new, is_modified = Unit.objects.update_from_unit(
                 self, unit, pos
             )
 
@@ -490,6 +492,28 @@ class Translation(models.Model, URLMixin, PercentMixin, LoggerMixin):
 
             # Store current unit ID
             created_units.add(newunit.id)
+
+            if change == Change.ACTION_UPLOAD and is_modified:
+
+                # Should we store history of edits?
+                # pylint: disable=R0204
+                if self.subproject.save_history:
+                    history_target = newunit.target
+                else:
+                    history_target = ''
+
+                history_objs.append(Change(
+                    unit=newunit,
+                    translation=self,
+                    subproject=self.subproject, #needed because, per bulk_create's caveats, the model's save() method will not be called
+                    action=change,
+                    user=user,
+                    author=user,
+                    target=history_target
+                ))
+
+        if len(history_objs) > 0:
+            Change.objects.bulk_create(history_objs)
 
         # Following query can get huge, so we should find better way
         # to delete stale units, probably sort of garbage collection

@@ -107,10 +107,10 @@ class UnitManager(models.Manager):
             created = True
 
         # Update all details
-        dbunit.update_from_unit(unit, pos, created)
+        modified = dbunit.update_from_unit(unit, pos, created)
 
         # Return result
-        return dbunit, created
+        return dbunit, created, modified
 
 
 class UnitQuerySet(models.QuerySet):
@@ -513,7 +513,7 @@ class Unit(models.Model, LoggerMixin):
                 pos == self.position and
                 content_hash == self.content_hash and
                 previous_source == self.previous_source):
-            return
+            return False
 
         # Ensure we track source string
         source_info, source_created = Source.objects.get_or_create(
@@ -558,6 +558,8 @@ class Unit(models.Model, LoggerMixin):
             self.update_has_failing_check(recurse=False, update_stats=False)
             self.update_has_comment(update_stats=False)
             self.update_has_suggestion(update_stats=False)
+
+        return True
 
     def is_plural(self):
         """Check whether message is plural."""
