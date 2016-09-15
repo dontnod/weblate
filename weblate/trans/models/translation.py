@@ -21,6 +21,7 @@
 from __future__ import unicode_literals
 
 import os
+import errno
 import codecs
 from datetime import timedelta
 import tempfile
@@ -57,6 +58,7 @@ from weblate.accounts.models import get_author_name
 from weblate.trans.models.change import Change
 from weblate.trans.checklists import TranslationChecklist
 from weblate.trans.po_to_xlsx_exporter import xlsx_to_po, PoToXlsxExporter
+from weblate.trans.data import data_dir
 
 
 class TranslationManager(models.Manager):
@@ -1155,23 +1157,34 @@ class Translation(models.Model, URLMixin, PercentMixin, LoggerMixin):
             else:
                 # At this point, filecopy is the memory data for the xlsx file
                 # Save this memory data on disk to be able to invoke easily a xlsx-to-po conversion:
-                temp_xlsx = tempfile.NamedTemporaryFile(suffix='.xlsx', mode='wb+')
-                temp_xlsx.write(filecopy)
-                temp_xlsx.flush()
-                # Conversion occurs on disk
-                alt_translation_column_name = self.get_language_code_as_in_original_po_file()
-                # The above is for the case multi-lang. download => (single-lang.) upload: don't look for translations 
-                # in column named Translation but rather named with the specific language code
-                # i.e. not self.language.code but rather the content of 'Language' metadata in the original .po
-                temp_po_name, repo_old_revision = xlsx_to_po(temp_xlsx.name, alt_translation_column_name)
-                # Now read the result back into filecopy (and tweak fileobj.name)
-                fileobj.name = temp_po_name
-                temp_po_obj = open(temp_po_name, 'r')
-                filecopy = temp_po_obj.read()
-                # At this point, filecopy is the memory data for the po file,
-                # so we can proceed to the easiest upload code branching (own loader)
-                os.remove(temp_po_name)
-                temp_xlsx.close() # auto remove (it's a tempfile)
+                if not os.path.exists(data_dir('upload_traces')):
+                    try:
+                        os.makedirs(data_dir('upload_traces'))
+                    except OSError as exc: # Guard against race condition
+                        if exc.errno != errno.EEXIST:
+                            raise
+                traced_xlsx_filename = os.path.join(
+                    data_dir('upload_traces'),
+                    '%s_%s.%s.xlsx' % (timezone.now().strftime("%Y%m%d_%H%M%S"),
+                                       self.subproject.get_full_slug(),
+                                       self.language.code))
+                # (NB: sure, it's weird only tracing the xlsx uploads and not the other ones, but...)
+                with open(traced_xlsx_filename, "w") as traced_xlsx:
+                    traced_xlsx.write(filecopy)
+                    traced_xlsx.flush()
+                    # Conversion occurs on disk
+                    alt_translation_column_name = self.get_language_code_as_in_original_po_file()
+                    # The above is for the case multi-lang. download => (single-lang.) upload: don't look for translations
+                    # in column named Translation but rather named with the specific language code
+                    # i.e. not self.language.code but rather the content of 'Language' metadata in the original .po
+                    temp_po_name, repo_old_revision = xlsx_to_po(traced_xlsx_filename, alt_translation_column_name)
+                    # Now read the result back into filecopy (and tweak fileobj.name)
+                    fileobj.name = temp_po_name
+                    with open(temp_po_name, "r") as temp_po_obj:
+                        filecopy = temp_po_obj.read()
+                    # At this point, filecopy is the memory data for the po file,
+                    # so we can proceed to the easiest upload code branching (own loader)
+                    os.remove(temp_po_name)
 
         # Load backend file
         store = try_load(
