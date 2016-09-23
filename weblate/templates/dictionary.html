@@ -53,6 +53,7 @@
 <tr>
 <th>{% trans "Source" %}</th>
 <th>{% trans "Translation" %}</th>
+<th>{% trans "Description" %}</th>
 <th></th>
 </tr>
 </thead>
@@ -61,6 +62,7 @@
 <tr>
 <td>{% format_translation word.source project.source_language simple=True %}</td>
 <td>{% format_translation word.target language simple=True %}</td>
+<td>{{ word.description }}</td>
 <td>
 {% if user_can_change_dictionary %}
 <form action="{% url 'edit_dictionary' project=project.slug lang=language.code pk=word.id %}" method="get" class="inlineform">
