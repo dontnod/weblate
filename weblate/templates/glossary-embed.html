@@ -9,6 +9,7 @@
     <tr>
     <td>{{ item.source }}</td>
     <td class="target">{% format_translation item.target unit.translation.language simple=True %}</td>
+	<td>{{ item.description }}</td>
     <td>
     {% if user_can_translate or user_can_suggest %}
     <a class="copydict btn btn-default btn-xs" title="{% trans "Copy word to translation" %}">{% trans "Copy" %}</a>

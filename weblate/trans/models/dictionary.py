@@ -22,6 +22,8 @@ from __future__ import unicode_literals
 
 import functools
 import re
+import csv
+import os
 import sys
 
 from django.core.urlresolvers import reverse
@@ -49,15 +51,36 @@ class DictionaryManager(models.Manager):
 
     def upload(self, request, project, language, fileobj, method):
         """Handle dictionary upload."""
+        # NB: just as the glossary csv export is manual and eschews ttkit,
+        # here we do something specific for the csv import
         from weblate.trans.models.change import Change
-        store = AutoFormat.parse(fileobj)
-
+        uploaded_words = []
         ret = 0
+        fileobj_name_base, fileobj_name_ext = os.path.splitext(fileobj.name)
+        if fileobj_name_ext == '.csv':
+            reader = csv.reader(fileobj)
+            is_header_row = True
+            columns = {}
+            for row in reader:
+                if is_header_row:
+                    i = 0
+                    for cell in row:
+                        columns[cell] = i
+                        i += 1
+                    is_header_row = False
+                else:
+                    uploaded_words.append({'source': row[columns['source']], 'target': row[columns['target']], 'description': row[columns['description']]})
+        else:
+            store = AutoFormat.parse(fileobj)
+            # process all units
+            for dummy, unit in store.iterate_merge(False):
+                uploaded_words.append({'source': unit.get_source(), 'target': unit.get_target(), 'description': ''})
 
-        # process all units
-        for dummy, unit in store.iterate_merge(False):
-            source = unit.get_source()
-            target = unit.get_target()
+        # process all words
+        for word in uploaded_words:
+            source = word['source']
+            target = word['target']
+            description = word['description']
 
             # Ignore too long words
             if len(source) > 190 or len(target) > 190:
@@ -71,6 +94,7 @@ class DictionaryManager(models.Manager):
                     source=source,
                     defaults={
                         'target': target,
+                        'description': description,
                     },
                 )
             except self.MultipleObjectsReturned:
@@ -84,7 +108,7 @@ class DictionaryManager(models.Manager):
             # Already existing entry found
             if not created:
                 # Same as current -> ignore
-                if target == word.target:
+                if target == word.target and description == word.description:
                     continue
                 if method == 'add':
                     # Add word
@@ -94,12 +118,15 @@ class DictionaryManager(models.Manager):
                         project=project,
                         language=language,
                         source=source,
-                        target=target
+                        target=target,
+                        description=description
                     )
                 elif method == 'overwrite':
                     # Update word
                     word.target = target
+                    word.description = description
                     word.save()
+                    # TODO (?): ACTION_DICTIONARY_UPLOAD Change (deferred as bulk?)
 
             ret += 1
 
@@ -114,7 +141,7 @@ class DictionaryManager(models.Manager):
             action=action,
             dictionary=created,
             user=user,
-            target=created.target,
+            target=str(created),
         )
         return created
 
@@ -190,6 +217,7 @@ class Dictionary(models.Model):
     language = models.ForeignKey(Language)
     source = models.CharField(max_length=190, db_index=True)
     target = models.CharField(max_length=190)
+    description = models.TextField(default='', blank=True)
 
     objects = DictionaryManager()
 
@@ -201,11 +229,12 @@ class Dictionary(models.Model):
         app_label = 'trans'
 
     def __str__(self):
-        return '{0}/{1}: {2} -> {3}'.format(
+        return '{0}/{1}: {2} -> {3} [{4}]'.format(
             self.project,
             self.language,
             self.source,
-            self.target
+            self.target,
+            self.description
         )
 
     @models.permalink
@@ -226,15 +255,16 @@ class Dictionary(models.Model):
             kwargs={'project': self.project.slug, 'lang': self.language.code}
         )
 
-    def edit(self, request, source, target):
+    def edit(self, request, source, target, description):
         """Edit word in a dictionary."""
         from weblate.trans.models.change import Change
         self.source = source
         self.target = target
+        self.description = description
         self.save()
         Change.objects.create(
             action=Change.ACTION_DICTIONARY_EDIT,
             dictionary=self,
             user=request.user,
-            target=self.target,
+            target=str(self)
         )

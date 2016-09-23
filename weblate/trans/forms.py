@@ -876,6 +876,7 @@ class WordForm(forms.Form):
     """Form for adding word to a glossary."""
     source = forms.CharField(label=_('Source'), max_length=190)
     target = forms.CharField(label=_('Translation'), max_length=190)
+    description = forms.CharField(label=_('Description'))
     words = CommaSeparatedIntegerField(
         widget=forms.HiddenInput,
         required=False
@@ -886,7 +887,7 @@ class InlineWordForm(WordForm):
     """Inline rendered form for adding words."""
     def __init__(self, *args, **kwargs):
         super(InlineWordForm, self).__init__(*args, **kwargs)
-        for fieldname in ('source', 'target'):
+        for fieldname in ('source', 'target', 'description'):
             field = self.fields[fieldname]
             field.widget.attrs['placeholder'] = field.label
             field.widget.attrs['size'] = 10

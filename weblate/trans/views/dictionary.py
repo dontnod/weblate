@@ -94,7 +94,8 @@ def edit_dictionary(request, project, lang, pk):
             word.edit(
                 request,
                 form.cleaned_data['source'],
-                form.cleaned_data['target']
+                form.cleaned_data['target'],
+                form.cleaned_data['description']
             )
             return redirect(
                 'show_dictionary',
@@ -103,7 +104,7 @@ def edit_dictionary(request, project, lang, pk):
             )
     else:
         form = WordForm(
-            initial={'source': word.source, 'target': word.target}
+            initial={'source': word.source, 'target': word.target, 'description': word.description}
         )
 
     last_changes = Change.objects.last_changes(request.user).filter(
@@ -228,7 +229,7 @@ def download_dictionary(request, project, lang):
             'show_dictionary',
             kwargs={'project': prj.slug, 'lang': lang.code}
         )),
-        fieldnames=('source', 'target'),
+        fieldnames=('source', 'target', 'description'),
     )
 
     # Add words
@@ -260,7 +261,8 @@ def add_dictionary(request, unit_id):
                 project=prj,
                 language=lang,
                 source=form.cleaned_data['source'],
-                target=form.cleaned_data['target']
+                target=form.cleaned_data['target'],
+                description=form.cleaned_data['description']
             )
             words = form.cleaned_data['words']
             words.append(word.id)
@@ -299,7 +301,8 @@ def show_dictionary(request, project, lang):
                 project=prj,
                 language=lang,
                 source=form.cleaned_data['source'],
-                target=form.cleaned_data['target']
+                target=form.cleaned_data['target'],
+                description=form.cleaned_data['description']
             )
         return redirect_next(
             request.POST.get('next'), request.get_full_path()
