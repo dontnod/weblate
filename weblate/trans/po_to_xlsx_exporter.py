@@ -130,13 +130,18 @@ class PoToXlsxExporter(object):
         # data sheet
         dws = wb.active
         dws.title = 'data'
+        do_write_data = False
+        dne_column_titles_set = set()
         for po_entry in po_data[0]: 
             if not po_entry.obsolete:
-                workbook_writing_instructions[dws.title] = {}
-                workbook_writing_instructions[dws.title]['first_data_row'] = 2
-                workbook_writing_instructions[dws.title]['column_key'] = PoToXlsxExporter.write_header_row(dws, 1, po_entry, trans_column_titles)
-                # assumes all entries (in all po files) are similar in terms of additional data
-                break
+                do_write_data = True
+                PoToXlsxExporter.update_dne_columns(po_entry, dne_column_titles_set)
+        if do_write_data:
+            workbook_writing_instructions[dws.title] = {}
+            workbook_writing_instructions[dws.title]['first_data_row'] = 2
+            dne_column_titles = list(dne_column_titles_set)
+            dne_column_titles.sort()
+            workbook_writing_instructions[dws.title]['column_key'] = PoToXlsxExporter.write_header_row(dws, 1, dne_column_titles, trans_column_titles)
         # metadata sheet
         hws = wb.create_sheet()
         hws.title = 'metadata'
@@ -144,16 +149,21 @@ class PoToXlsxExporter(object):
         workbook_writing_instructions[hws.title]['first_data_row'] = 1
         # obsolete data sheet (when applicable) 
         # (multiple po: just skip obsolete data for now, as it's even more unreasonable to assume
-        #  identifcal structure across languages for obsolete data than it is for regular data)
+        #  identical structure across languages for obsolete data than it is for regular data)
         if len(po_data) == 1:
-            for po_entry in po_data[0].obsolete_entries(): 
+            do_write_obsolete_data = False
+            dne_column_titles_set = set()
+            for po_entry in po_data[0].obsolete_entries():
+                do_write_obsolete_data = True
+                PoToXlsxExporter.update_dne_columns(po_entry, dne_column_titles_set)
+            if do_write_obsolete_data:
                 ows = wb.create_sheet()
                 ows.title = 'obsolete data'
                 workbook_writing_instructions[ows.title] = {}
                 workbook_writing_instructions[ows.title]['first_data_row'] = 2
-                workbook_writing_instructions[ows.title]['column_key'] = PoToXlsxExporter.write_header_row(ows, 1, po_entry, trans_column_titles)
-                # assumes all entries are similar in terms of additional data
-                break
+                dne_column_titles = list(dne_column_titles_set)
+                dne_column_titles.sort()
+                workbook_writing_instructions[ows.title]['column_key'] = PoToXlsxExporter.write_header_row(ows, 1, dne_column_titles, trans_column_titles)
         return wb, workbook_writing_instructions
 
     @staticmethod
@@ -169,7 +179,7 @@ class PoToXlsxExporter(object):
         return j
 
     @staticmethod
-    def write_header_row(ws, i, po_entry, trans_column_titles):
+    def write_header_row(ws, i, dne_column_titles, trans_column_titles):
         column_key = {}
         current_column = 1
         # Regular data (classic po): the important ones
@@ -177,9 +187,7 @@ class PoToXlsxExporter(object):
         current_column = PoToXlsxExporter.write_header_row_part(ws, i, current_column, column_key, '', regular_important_columns)
         # Additional data (DNE data, embedded in comment)
         # (we consider that pretty important so show it before other classic po columns)
-        dne_columns = list(PoToXlsxExporter.analyze_raw_comment(po_entry.comment).keys())
-        dne_columns.sort()
-        current_column = PoToXlsxExporter.write_header_row_part(ws, i, current_column, column_key, '[DNE]', dne_columns)
+        current_column = PoToXlsxExporter.write_header_row_part(ws, i, current_column, column_key, '[DNE]', dne_column_titles)
         # Regular data (classic po): the less important ones
         regular_less_important_columns = ['Occurrences', 'Flags', 'Translator Comment', 
                                           'Previous Source', 'Previous Context', 
@@ -190,6 +198,10 @@ class PoToXlsxExporter(object):
         current_column = PoToXlsxExporter.write_header_row_part(ws, i, current_column, column_key, '', regular_less_important_columns)
         # ignore_for_now  = ['Source Plural', 'Translation Plural', 'Previous Source Plural', 'Line Number']
         return column_key
+
+    @staticmethod
+    def update_dne_columns(po_entry, dne_columns):
+        dne_columns.update(set(PoToXlsxExporter.analyze_raw_comment(po_entry.comment).keys()))
 
     @staticmethod
     def analyze_raw_comment(comment):
