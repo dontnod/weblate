@@ -125,6 +125,10 @@ class PoToXlsxExporter(object):
         wb = Workbook()
         workbook_writing_instructions = {}
         workbook_writing_instructions['repo_last_revision'] = repo_last_revision
+        # The below will be helpful when exporting more than one language
+        # Assumption though here: first language MUST be en and we have this weird situation where we
+        # try to write a multi-lang. xlsx but actually en po and foreign po have a different set of (id, ctxt)
+        # due to the en tweaks becoming "sources" for foreign pos... so it's a quite messy multi-lang. xlsx anyway
         workbook_writing_instructions['data_line_dictionary'] = {}
         trans_column_titles = PoToXlsxExporter.get_trans_column_titles(po_data)
         # data sheet
@@ -267,8 +271,11 @@ class PoToXlsxExporter(object):
         PoToXlsxExporter.inject_value('', trans_column_title, po_entry.msgstr, ws, real_i, column_key)
         PoToXlsxExporter.inject_value('', 'Context', po_entry.msgctxt, ws, real_i, column_key)
         PoToXlsxExporter.inject_value('', 'Comment', po_entry.comment, ws, real_i, column_key)
-        workbook_writing_instructions['data_line_dictionary'][(po_entry.msgctxt, po_entry.comment)] = real_i 
-        # NB: for the above dictionary, it would be better to extract key(s) from comment than to use the whole comment
+        # Fairly twisted rules below because of the multi-lang. & tweaks mess:
+        tweaked_msgid = po_entry.msgid if po_entry.msgstr == '' else po_entry.msgstr
+        if (po_entry.msgctxt, tweaked_msgid) not in workbook_writing_instructions['data_line_dictionary']:
+            workbook_writing_instructions['data_line_dictionary'][(po_entry.msgctxt, tweaked_msgid)] = set()
+        workbook_writing_instructions['data_line_dictionary'][(po_entry.msgctxt, tweaked_msgid)].update(set([real_i]))
         PoToXlsxExporter.inject_value('', 'Translator Comment', po_entry.tcomment, ws, real_i, column_key)
         PoToXlsxExporter.inject_value('', 'Occurrences', _format_occurrences(po_entry.occurrences), ws, real_i, column_key)
         PoToXlsxExporter.inject_value('', 'Flags', _format_flags(po_entry.flags), ws, real_i, column_key)
@@ -285,8 +292,8 @@ class PoToXlsxExporter(object):
     @staticmethod
     def fill_other_trans(po_entry, ws, workbook_writing_instructions, trans_column_title):
         column_key = workbook_writing_instructions[ws.title]['column_key']
-        real_i = workbook_writing_instructions['data_line_dictionary'][(po_entry.msgctxt, po_entry.comment)]
-        PoToXlsxExporter.inject_value('', trans_column_title, po_entry.msgstr, ws, real_i, column_key)
+        for real_i in workbook_writing_instructions['data_line_dictionary'][(po_entry.msgctxt, po_entry.msgid)]:
+            PoToXlsxExporter.inject_value('', trans_column_title, po_entry.msgstr, ws, real_i, column_key)
 
     @staticmethod
     def parse_workbook(wb, simple_mode, alt_translation_column_name=None):
