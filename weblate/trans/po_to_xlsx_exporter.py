@@ -72,21 +72,22 @@ class PoToXlsxExporter(object):
         PoToXlsxExporter.sort_by_lang(po_data)
         wb, workbook_writing_instructions = PoToXlsxExporter.init_workbook(po_data, repo_last_revision)
         PoToXlsxExporter.fill_metadata(po_data, wb['metadata'], workbook_writing_instructions)
+        multiple_lang = len(po_data) > 1
         i = 0
         for po_entry in po_data[0]: 
             if not po_entry.obsolete:
-                PoToXlsxExporter.add_po_entry(po_entry, wb['data'], i, workbook_writing_instructions, PoToXlsxExporter.get_trans_column_title(po_data[0], len(po_data) > 1))
+                PoToXlsxExporter.add_po_entry(po_entry, wb['data'], i, workbook_writing_instructions, PoToXlsxExporter.get_trans_column_title(po_data[0], multiple_lang), multiple_lang)
                 i += 1
-        if len(po_data) > 1:
+        if multiple_lang:
             # now for all other languages, there is only one column to fill
             for i in range(1, len(po_data)):
                 for po_entry in po_data[i]: 
                     if not po_entry.obsolete:
-                        PoToXlsxExporter.fill_other_trans(po_entry, wb['data'], workbook_writing_instructions, PoToXlsxExporter.get_trans_column_title(po_data[i], len(po_data) > 1))
-        if len(po_data) == 1: # (multiple po: just skip obsolete data for now)
+                        PoToXlsxExporter.fill_other_trans(po_entry, wb['data'], workbook_writing_instructions, PoToXlsxExporter.get_trans_column_title(po_data[i], multiple_lang))
+        if not multiple_lang: # (multiple po: just skip obsolete data for now)
             i = 0
             for po_entry in po_data[0].obsolete_entries(): 
-                PoToXlsxExporter.add_po_entry(po_entry, wb['obsolete data'], i, workbook_writing_instructions, PoToXlsxExporter.get_trans_column_title(po_data[0], len(po_data) > 1))
+                PoToXlsxExporter.add_po_entry(po_entry, wb['obsolete data'], i, workbook_writing_instructions, PoToXlsxExporter.get_trans_column_title(po_data[0], multiple_lang), multiple_lang)
                 i += 1
         PoToXlsxExporter.finalize_workbook(wb)
         return wb
@@ -130,6 +131,7 @@ class PoToXlsxExporter(object):
         # try to write a multi-lang. xlsx but actually en po and foreign po have a different set of (id, ctxt)
         # due to the en tweaks becoming "sources" for foreign pos... so it's a quite messy multi-lang. xlsx anyway
         workbook_writing_instructions['data_line_dictionary'] = {}
+        workbook_writing_instructions['data_line_dictionary_tweak_sources'] = {} # useful in case of "fresh" en tweaks
         trans_column_titles = PoToXlsxExporter.get_trans_column_titles(po_data)
         # data sheet
         dws = wb.active
@@ -252,7 +254,7 @@ class PoToXlsxExporter(object):
         ws.cell(row=i, column=column_key[prefix_for_column_key + key]).value = value
 
     @staticmethod
-    def add_po_entry(po_entry, ws, i, workbook_writing_instructions, trans_column_title):
+    def add_po_entry(po_entry, ws, i, workbook_writing_instructions, trans_column_title, multiple_lang):
         def _format_flags(flags):
             return '\n'.join(flags)
 
@@ -271,11 +273,17 @@ class PoToXlsxExporter(object):
         PoToXlsxExporter.inject_value('', trans_column_title, po_entry.msgstr, ws, real_i, column_key)
         PoToXlsxExporter.inject_value('', 'Context', po_entry.msgctxt, ws, real_i, column_key)
         PoToXlsxExporter.inject_value('', 'Comment', po_entry.comment, ws, real_i, column_key)
-        # Fairly twisted rules below because of the multi-lang. & tweaks mess:
-        tweaked_msgid = po_entry.msgid if po_entry.msgstr == '' else po_entry.msgstr
-        if (po_entry.msgctxt, tweaked_msgid) not in workbook_writing_instructions['data_line_dictionary']:
-            workbook_writing_instructions['data_line_dictionary'][(po_entry.msgctxt, tweaked_msgid)] = set()
-        workbook_writing_instructions['data_line_dictionary'][(po_entry.msgctxt, tweaked_msgid)].update(set([real_i]))
+        if multiple_lang:
+            # Fairly twisted rules below because of the tweaks mess:
+            tweaked_msgid = po_entry.msgid if po_entry.msgstr == '' else po_entry.msgstr
+            if (po_entry.msgctxt, tweaked_msgid) not in workbook_writing_instructions['data_line_dictionary']:
+                workbook_writing_instructions['data_line_dictionary'][(po_entry.msgctxt, tweaked_msgid)] = set()
+            workbook_writing_instructions['data_line_dictionary'][(po_entry.msgctxt, tweaked_msgid)].update(set([real_i]))
+            if po_entry.msgstr != '':
+                # this tweak might be "fresh" i.e. not yet propagated as source for foreign languages
+                if (po_entry.msgctxt, po_entry.msgid) not in workbook_writing_instructions['data_line_dictionary_tweak_sources']:
+                    workbook_writing_instructions['data_line_dictionary_tweak_sources'][(po_entry.msgctxt, po_entry.msgid)] = set()
+                workbook_writing_instructions['data_line_dictionary_tweak_sources'][(po_entry.msgctxt, po_entry.msgid)].update(set([real_i]))
         PoToXlsxExporter.inject_value('', 'Translator Comment', po_entry.tcomment, ws, real_i, column_key)
         PoToXlsxExporter.inject_value('', 'Occurrences', _format_occurrences(po_entry.occurrences), ws, real_i, column_key)
         PoToXlsxExporter.inject_value('', 'Flags', _format_flags(po_entry.flags), ws, real_i, column_key)
@@ -292,7 +300,11 @@ class PoToXlsxExporter(object):
     @staticmethod
     def fill_other_trans(po_entry, ws, workbook_writing_instructions, trans_column_title):
         column_key = workbook_writing_instructions[ws.title]['column_key']
-        for real_i in workbook_writing_instructions['data_line_dictionary'][(po_entry.msgctxt, po_entry.msgid)]:
+        try:
+            set_real_i = workbook_writing_instructions['data_line_dictionary'][(po_entry.msgctxt, po_entry.msgid)]
+        except KeyError:
+            set_real_i = workbook_writing_instructions['data_line_dictionary_tweak_sources'][(po_entry.msgctxt, po_entry.msgid)]
+        for real_i in set_real_i:
             PoToXlsxExporter.inject_value('', trans_column_title, po_entry.msgstr, ws, real_i, column_key)
 
     @staticmethod
