@@ -7,27 +7,15 @@
 <tr id="row-status-{{ item.unit.checksum }}">
 <td>{{ item.unit.position }}</td>
 <td>
-{% if item.unit.context %}
-<div class="pull-right flip">
-<label>{% trans "Context:" %}</label>
-{{ item.unit.context }}
-</div>
-{% endif %}
+{% with item.unit as unit %}
+    {% include "unit-context.html" %}
+{% endwith %}
 {% get_location_links user.profile item.unit %}
 </td>
 <td>
 <a href="{% url 'translate' project=object.subproject.project.slug subproject=object.subproject.slug lang=object.language.code %}?{{ search_url }}&amp;offset={{ item.offset }}" class="btn btn-xs btn-default pull-right flip" title="{% trans "Open in full editor" %}"><i class="fa fa-pencil"></i> {% trans "Edit" %}</a>
 </td>
 </tr>
-{% if item.unit.comment %}
-<tr id="row-comment-{{ item.unit.checksum }}">
-<td></td>
-<td colspan="2" class="translatetext">
-    <label>{% trans "Source string comment" %}</label>
-    {% format_translation item.unit.comment item.unit.translation.subproject.project.source_language %}
-</td>
-</tr>
-{% endif %}
 <tr id="row-source-{{ item.unit.checksum }}">
 <td></td>
 <td colspan="2" class="translatetext">
