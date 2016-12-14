@@ -186,7 +186,6 @@ Released on Nov 4th 2016.
 * Improved UX of languages selection in profile.
 * Fixed showing whiteboard messages for component.
 * Keep preferences tab selected after saving.
-* Show source string comment more prominently.
 * Automatically install Gettext PO merge driver for Git repositories.
 * Added search and replace feature.
 * Added support for uploading visual context (screenshots) for translations.
