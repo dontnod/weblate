@@ -147,7 +147,7 @@ class PoToXlsxExporter(object):
             workbook_writing_instructions[dws.title]['first_data_row'] = 2
             dne_column_titles = list(dne_column_titles_set)
             dne_column_titles.sort()
-            workbook_writing_instructions[dws.title]['column_key'] = PoToXlsxExporter.write_header_row(dws, 1, dne_column_titles, trans_column_titles)
+            workbook_writing_instructions[dws.title]['column_map'] = PoToXlsxExporter.write_header_row(dws, 1, dne_column_titles, trans_column_titles)
         # metadata sheet
         hws = wb.create_sheet()
         hws.title = 'metadata'
@@ -169,41 +169,43 @@ class PoToXlsxExporter(object):
                 workbook_writing_instructions[ows.title]['first_data_row'] = 2
                 dne_column_titles = list(dne_column_titles_set)
                 dne_column_titles.sort()
-                workbook_writing_instructions[ows.title]['column_key'] = PoToXlsxExporter.write_header_row(ows, 1, dne_column_titles, trans_column_titles)
+                workbook_writing_instructions[ows.title]['column_map'] = PoToXlsxExporter.write_header_row(ows, 1, dne_column_titles, trans_column_titles)
         return wb, workbook_writing_instructions
 
     @staticmethod
-    def write_header_row_part(ws, i, j, column_key, prefix_for_column_key, headers):
-        header_fill = PatternFill(fill_type='solid', fgColor = 'FFFFFF4D' if prefix_for_column_key == '' else 'FFB3B3FF')
+    def write_header_row_part(ws, i, j, column_map, prefix_for_column_map, headers):
+        header_fill = PatternFill(fill_type='solid', fgColor = 'FFFFFF4D' if prefix_for_column_map == '' else 'FFB3B3FF')
         # different color for Regular data (classic po) vs. Additional data (DNE data, embedded in comment)
         for header in headers:
             ws.cell(row=i, column=j).value = header
             ws.cell(row=i, column=j).fill = header_fill
-            if not column_key is None:
-                column_key[prefix_for_column_key + header] = j
+            if not column_map is None:
+                column_map[prefix_for_column_map + header] = j
             j += 1
         return j
 
     @staticmethod
+    def get_regular_less_important_columns():
+        # Regular data (classic po): the less important ones
+        # Comment (raw) is not considered important because it bears data that is not relevant
+        # for translation/recording ('key' unique id), or data repeated in occurrences, or
+        # additional data visible as unique columns, etc. So we ditch it at the end
+        return ['Occurrences', 'Flags', 'Translator Comment', 'Previous Source', 'Previous Context', 'Comment']
+
+    @staticmethod
     def write_header_row(ws, i, dne_column_titles, trans_column_titles):
-        column_key = {}
+        column_map = {}
         current_column = 1
         # Regular data (classic po): the important ones
         regular_important_columns = ['Source'] + trans_column_titles + ['Context']
-        current_column = PoToXlsxExporter.write_header_row_part(ws, i, current_column, column_key, '', regular_important_columns)
+        current_column = PoToXlsxExporter.write_header_row_part(ws, i, current_column, column_map, '', regular_important_columns)
         # Additional data (DNE data, embedded in comment)
         # (we consider that pretty important so show it before other classic po columns)
-        current_column = PoToXlsxExporter.write_header_row_part(ws, i, current_column, column_key, '[DNE]', dne_column_titles)
-        # Regular data (classic po): the less important ones
-        regular_less_important_columns = ['Occurrences', 'Flags', 'Translator Comment', 
-                                          'Previous Source', 'Previous Context', 
-                                          'Comment']
-        # Comment (raw) is not considered important because it bears data that is not relevant 
-        # for translation/recording ('key' unique id), or data repeated in occurrences, or
-        # additional data visible as unique columns, etc. So we ditch it at the end
-        current_column = PoToXlsxExporter.write_header_row_part(ws, i, current_column, column_key, '', regular_less_important_columns)
+        current_column = PoToXlsxExporter.write_header_row_part(ws, i, current_column, column_map, '[DNE]', dne_column_titles)
+        # Other classic po columns
+        current_column = PoToXlsxExporter.write_header_row_part(ws, i, current_column, column_map, '', PoToXlsxExporter.get_regular_less_important_columns())
         # ignore_for_now  = ['Source Plural', 'Translation Plural', 'Previous Source Plural', 'Line Number']
-        return column_key
+        return column_map
 
     @staticmethod
     def update_dne_columns(po_entry, dne_columns):
@@ -250,8 +252,8 @@ class PoToXlsxExporter(object):
             PoToXlsxExporter.finalize_worksheet(ws)
 
     @staticmethod
-    def inject_value(prefix_for_column_key, key, value, ws, i, column_key):
-        ws.cell(row=i, column=column_key[prefix_for_column_key + key]).value = value
+    def inject_value(prefix_for_column_map, key, value, ws, i, column_map):
+        ws.cell(row=i, column=column_map[prefix_for_column_map + key]).value = value
 
     @staticmethod
     def add_po_entry(po_entry, ws, i, workbook_writing_instructions, trans_column_title, multiple_lang):
@@ -268,11 +270,11 @@ class PoToXlsxExporter(object):
             return '\n'.join(_format_occurrence(fpath, lineno) for fpath, lineno in occurrences)
 
         real_i = workbook_writing_instructions[ws.title]['first_data_row'] + i
-        column_key = workbook_writing_instructions[ws.title]['column_key']
-        PoToXlsxExporter.inject_value('', 'Source', po_entry.msgid, ws, real_i, column_key)
-        PoToXlsxExporter.inject_value('', trans_column_title, po_entry.msgstr, ws, real_i, column_key)
-        PoToXlsxExporter.inject_value('', 'Context', po_entry.msgctxt, ws, real_i, column_key)
-        PoToXlsxExporter.inject_value('', 'Comment', po_entry.comment, ws, real_i, column_key)
+        column_map = workbook_writing_instructions[ws.title]['column_map']
+        PoToXlsxExporter.inject_value('', 'Source', po_entry.msgid, ws, real_i, column_map)
+        PoToXlsxExporter.inject_value('', trans_column_title, po_entry.msgstr, ws, real_i, column_map)
+        PoToXlsxExporter.inject_value('', 'Context', po_entry.msgctxt, ws, real_i, column_map)
+        PoToXlsxExporter.inject_value('', 'Comment', po_entry.comment, ws, real_i, column_map)
         if multiple_lang:
             # Fairly twisted rules below because of the tweaks mess:
             tweaked_msgid = po_entry.msgid if po_entry.msgstr == '' else po_entry.msgstr
@@ -284,28 +286,28 @@ class PoToXlsxExporter(object):
                 if (po_entry.msgctxt, po_entry.msgid) not in workbook_writing_instructions['data_line_dictionary_tweak_sources']:
                     workbook_writing_instructions['data_line_dictionary_tweak_sources'][(po_entry.msgctxt, po_entry.msgid)] = set()
                 workbook_writing_instructions['data_line_dictionary_tweak_sources'][(po_entry.msgctxt, po_entry.msgid)].update(set([real_i]))
-        PoToXlsxExporter.inject_value('', 'Translator Comment', po_entry.tcomment, ws, real_i, column_key)
-        PoToXlsxExporter.inject_value('', 'Occurrences', _format_occurrences(po_entry.occurrences), ws, real_i, column_key)
-        PoToXlsxExporter.inject_value('', 'Flags', _format_flags(po_entry.flags), ws, real_i, column_key)
-        PoToXlsxExporter.inject_value('', 'Previous Source', po_entry.previous_msgid, ws, real_i, column_key)
-        PoToXlsxExporter.inject_value('', 'Previous Context', po_entry.previous_msgctxt, ws, real_i, column_key)
+        PoToXlsxExporter.inject_value('', 'Translator Comment', po_entry.tcomment, ws, real_i, column_map)
+        PoToXlsxExporter.inject_value('', 'Occurrences', _format_occurrences(po_entry.occurrences), ws, real_i, column_map)
+        PoToXlsxExporter.inject_value('', 'Flags', _format_flags(po_entry.flags), ws, real_i, column_map)
+        PoToXlsxExporter.inject_value('', 'Previous Source', po_entry.previous_msgid, ws, real_i, column_map)
+        PoToXlsxExporter.inject_value('', 'Previous Context', po_entry.previous_msgctxt, ws, real_i, column_map)
         # Ignore for now
-        # PoToXlsxExporter.inject_value('', 'Source Plural', po_entry.msgid_plural, ws, real_i, column_key)
-        # PoToXlsxExporter.inject_value('', 'Translation Plural', po_entry.msgstr_plural, ws, real_i, column_key)
-        # PoToXlsxExporter.inject_value('', 'Previous Source Plural', po_entry.previous_msgid_plural, ws, real_i, column_key)
-        # PoToXlsxExporter.inject_value('', 'Line Number', po_entry.linenum, ws, real_i, column_key)
+        # PoToXlsxExporter.inject_value('', 'Source Plural', po_entry.msgid_plural, ws, real_i, column_map)
+        # PoToXlsxExporter.inject_value('', 'Translation Plural', po_entry.msgstr_plural, ws, real_i, column_map)
+        # PoToXlsxExporter.inject_value('', 'Previous Source Plural', po_entry.previous_msgid_plural, ws, real_i, column_map)
+        # PoToXlsxExporter.inject_value('', 'Line Number', po_entry.linenum, ws, real_i, column_map)
         for key, value in PoToXlsxExporter.analyze_raw_comment(po_entry.comment).items():
-            PoToXlsxExporter.inject_value('[DNE]', key, value, ws, real_i, column_key)
+            PoToXlsxExporter.inject_value('[DNE]', key, value, ws, real_i, column_map)
 
     @staticmethod
     def fill_other_trans(po_entry, ws, workbook_writing_instructions, trans_column_title):
-        column_key = workbook_writing_instructions[ws.title]['column_key']
+        column_map = workbook_writing_instructions[ws.title]['column_map']
         try:
             set_real_i = workbook_writing_instructions['data_line_dictionary'][(po_entry.msgctxt, po_entry.msgid)]
         except KeyError:
             set_real_i = workbook_writing_instructions['data_line_dictionary_tweak_sources'][(po_entry.msgctxt, po_entry.msgid)]
         for real_i in set_real_i:
-            PoToXlsxExporter.inject_value('', trans_column_title, po_entry.msgstr, ws, real_i, column_key)
+            PoToXlsxExporter.inject_value('', trans_column_title, po_entry.msgstr, ws, real_i, column_map)
 
     @staticmethod
     def parse_workbook(wb, simple_mode, alt_translation_column_name=None):
@@ -321,11 +323,11 @@ class PoToXlsxExporter(object):
         if sheetname in wb.sheetnames:
             workbook_reading_instructions[sheetname] = {}
             workbook_reading_instructions[sheetname]['first_data_row'] = first_data_row
-            workbook_reading_instructions[sheetname]['column_key'] = PoToXlsxExporter.read_header_row(wb[sheetname], header_row)
+            workbook_reading_instructions[sheetname]['column_multimap'] = PoToXlsxExporter.read_header_row(wb[sheetname], header_row)
             if (alt_translation_column_name is not None 
-                and 'Translation' not in workbook_reading_instructions[sheetname]['column_key'] 
-                and alt_translation_column_name in workbook_reading_instructions[sheetname]['column_key']):
-                workbook_reading_instructions[sheetname]['column_key']['Translation'] = workbook_reading_instructions[sheetname]['column_key'][alt_translation_column_name]
+                and 'Translation' not in workbook_reading_instructions[sheetname]['column_multimap'] 
+                and alt_translation_column_name in workbook_reading_instructions[sheetname]['column_multimap']):
+                workbook_reading_instructions[sheetname]['column_multimap']['Translation'] = workbook_reading_instructions[sheetname]['column_multimap'][alt_translation_column_name]
 
     @staticmethod
     def init_po(wb, alt_translation_column_name=None):
@@ -343,11 +345,13 @@ class PoToXlsxExporter(object):
 
     @staticmethod
     def read_header_row(ws, i):
-        column_key = {}
-        current_column = 1
+        column_multimap = {}
         for j in range(1, ws.max_column + 1):
-            column_key[ws.cell(row=i, column=j).value] = j
-        return column_key
+            column_name = ws.cell(row=i, column=j).value
+            if column_name not in column_multimap:
+                column_multimap[column_name] = []
+            column_multimap[column_name].append(j)
+        return column_multimap
 
     @staticmethod
     def read_metadata(po_data, wb, workbook_reading_instructions):
@@ -367,24 +371,24 @@ class PoToXlsxExporter(object):
     def read_any_data(po_data, ws, workbook_reading_instructions, obsolete, simple_mode=False):
         for i in range(workbook_reading_instructions[ws.title]['first_data_row'], ws.max_row + 1):
             po_entry = POEntry()
-            column_key = workbook_reading_instructions[ws.title]['column_key']
-            po_entry.msgid = PoToXlsxExporter.read_value(ws, i, 'Source', column_key)
-            po_entry.msgstr = PoToXlsxExporter.read_value(ws, i, 'Translation', column_key)
-            po_entry.msgctxt = PoToXlsxExporter.read_value(ws, i, 'Context', column_key, keep_none=True)
+            column_multimap = workbook_reading_instructions[ws.title]['column_multimap']
+            po_entry.msgid = PoToXlsxExporter.read_value(ws, i, 'Source', column_multimap)
+            po_entry.msgstr = PoToXlsxExporter.read_value(ws, i, 'Translation', column_multimap)
+            po_entry.msgctxt = PoToXlsxExporter.read_value(ws, i, 'Context', column_multimap, keep_none=True)
             po_entry.obsolete = obsolete
-            po_entry.tcomment = PoToXlsxExporter.read_value(ws, i, 'Translator Comment', column_key)
-            flags = PoToXlsxExporter.read_value(ws, i, 'Flags', column_key)
+            po_entry.tcomment = PoToXlsxExporter.read_value(ws, i, 'Translator Comment', column_multimap)
+            flags = PoToXlsxExporter.read_value(ws, i, 'Flags', column_multimap)
             if flags:
                 po_entry.flags = flags.split('\n')
-            po_entry.previous_msgid = PoToXlsxExporter.read_value(ws, i, 'Previous Source', column_key)
-            po_entry.previous_msgctxt = PoToXlsxExporter.read_value(ws, i, 'Previous Context', column_key)
+            po_entry.previous_msgid = PoToXlsxExporter.read_value(ws, i, 'Previous Source', column_multimap)
+            po_entry.previous_msgctxt = PoToXlsxExporter.read_value(ws, i, 'Previous Context', column_multimap)
             if not simple_mode:
                 # Typically (upload scenario in Weblate),
                 # (extracted) comments and occurrences are not at all needed in the output file
                 # if said po file is just used for a merge towards a more regular file
-                comment = PoToXlsxExporter.read_value(ws, i, 'Comment', column_key)
+                comment = PoToXlsxExporter.read_value(ws, i, 'Comment', column_multimap)
                 po_entry.comment = comment
-                occurrences = PoToXlsxExporter.read_value(ws, i, 'Occurrences', column_key)
+                occurrences = PoToXlsxExporter.read_value(ws, i, 'Occurrences', column_multimap)
                 if occurrences:
                     occurrences_list = occurrences.split('\n')
                     for occurrence in occurrences_list:
@@ -399,15 +403,21 @@ class PoToXlsxExporter(object):
                         # Maybe this colon (:) character in occurrences should be handled differently as early as
                         # in ManifestToPot so as to not disturb polib
             # Ignore for now
-            # po_entry.msgid_plural = PoToXlsxExporter.read_value(ws, i, 'Source Plural', column_key)
-            # po_entry.msgstr_plural = PoToXlsxExporter.read_value(ws, i, 'Translation Plural', column_key)
-            # po_entry.previous_msgid_plural = PoToXlsxExporter.read_value(ws, i, 'Previous Source Plural', column_key)
-            # po_entry.linenum = PoToXlsxExporter.read_value(ws, i, 'Line Number', column_key)
+            # po_entry.msgid_plural = PoToXlsxExporter.read_value(ws, i, 'Source Plural', column_multimap)
+            # po_entry.msgstr_plural = PoToXlsxExporter.read_value(ws, i, 'Translation Plural', column_multimap)
+            # po_entry.previous_msgid_plural = PoToXlsxExporter.read_value(ws, i, 'Previous Source Plural', column_multimap)
+            # po_entry.linenum = PoToXlsxExporter.read_value(ws, i, 'Line Number', column_multimap)
             po_data.append(po_entry)
 
     @staticmethod
-    def read_value(ws, i, key, column_key, keep_none=False, fix_carriage_return=True):
-        value = ws.cell(row=i, column=column_key[key]).value
+    def read_value(ws, i, key, column_multimap, keep_none=False, fix_carriage_return=True):
+        column_index_list = column_multimap[key]
+        # Now, which entry in this multimap value sould we consider? First? Last? Other??
+        # Gotta try our best to inverse what we did in po-to-xlsx...
+        target = -1 if key in PoToXlsxExporter.get_regular_less_important_columns() else 0
+        # (we know we ditched those "regular_less_important_columns" at the end / by default, take the first)
+        column_index = column_index_list[target]
+        value = ws.cell(row=i, column=column_index).value
         if fix_carriage_return and value is not None:
             value = value.replace('_x000D_', '\r')
         if keep_none:
