@@ -406,8 +406,10 @@ class PoToXlsxExporter(object):
             po_data.append(po_entry)
 
     @staticmethod
-    def read_value(ws, i, key, column_key, keep_none=False):
+    def read_value(ws, i, key, column_key, keep_none=False, fix_carriage_return=True):
         value = ws.cell(row=i, column=column_key[key]).value
+        if fix_carriage_return and value is not None:
+            value = value.replace('_x000D_', '\r')
         if keep_none:
             return value
         else:
