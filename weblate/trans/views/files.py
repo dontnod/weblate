@@ -121,6 +121,7 @@ def upload_translation(request, project, subproject, lang):
             method=form.cleaned_data['method'],
             fuzzy=form.cleaned_data['fuzzy'],
             diff_past=form.cleaned_data['diff_past'],
+            atomic_upload=form.cleaned_data['atomic_upload'],
         )
         if total == 0:
             message = _('No strings were imported from the uploaded file.')

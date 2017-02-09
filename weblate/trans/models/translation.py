@@ -29,7 +29,7 @@ import tempfile
 from polib import *
 
 from django.conf import settings
-from django.db import models
+from django.db import models, transaction
 from django.contrib.auth.models import User
 from django.db.models import Sum, Count
 from django.utils.translation import ugettext as _
@@ -59,6 +59,12 @@ from weblate.trans.models.change import Change
 from weblate.trans.checklists import TranslationChecklist
 from weblate.trans.po_to_xlsx_exporter import xlsx_to_po, PoToXlsxExporter
 from weblate.trans.data import data_dir
+
+class dummy_context_mgr(): # Should probably be put somewhere else e.g. utils
+    def __enter__(self):
+        return None
+    def __exit__(self, exc_type, exc_value, traceback):
+        return False
 
 
 class TranslationManager(models.Manager):
@@ -1139,7 +1145,7 @@ class Translation(models.Model, URLMixin, PercentMixin, LoggerMixin):
             return PoToXlsxExporter.get_trans_column_title(po_data, True)
     
     def merge_upload(self, request, fileobj, overwrite, author=None,
-                     merge_header=True, method='translate', fuzzy='', diff_past=True):
+                     merge_header=True, method='translate', fuzzy='', diff_past=True, atomic_upload=False):
         """Top level handler for file uploads."""
         filecopy = fileobj.read()
         fileobj.close()
@@ -1219,18 +1225,20 @@ class Translation(models.Model, URLMixin, PercentMixin, LoggerMixin):
         if method in ('translate', 'fuzzy'):
             # Merge on units level
             with self.subproject.repository.lock:
-                return self.merge_translations(
-                    request,
-                    store,
-                    overwrite,
-                    (method == 'fuzzy'),
-                    fuzzy,
-                    merge_header,
-                    old_store=old_store
-                )
+                with transaction.atomic() if atomic_upload else dummy_context_mgr():
+                    return self.merge_translations(
+                        request,
+                        store,
+                        overwrite,
+                        (method == 'fuzzy'),
+                        fuzzy,
+                        merge_header,
+                        old_store=old_store
+                    )
 
         # Add as sugestions
-        return self.merge_suggestions(request, store, fuzzy, old_store=old_store)
+        with transaction.atomic() if atomic_upload else dummy_context_mgr():
+            return self.merge_suggestions(request, store, fuzzy, old_store=old_store)
 
     def invalidate_cache(self, cache_type=None):
         """Invalidate any cached stats."""
