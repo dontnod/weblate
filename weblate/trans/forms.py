@@ -489,6 +489,12 @@ class SimpleUploadForm(forms.Form):
         required=False,
         initial=True,
     )
+    atomic_upload = forms.BooleanField(
+        label=_('[DNE] [Experimental] Make the upload faster by making a single transaction'),
+        help_text=_('Big uploads are way too slow on sqlite, so this option is pretty much mandatory on the test environment. You might want to use it in production too (mysql) if the uploads take ages.'),
+        required=False,
+        initial=False,
+    )
 
     def remove_translation_choice(self, value):
         """Remove add as translation choice."""
