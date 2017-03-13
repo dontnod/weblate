@@ -42,7 +42,7 @@ from weblate.trans.models import (
 from weblate.requirements import get_versions, get_optional_versions
 from weblate.lang.models import Language
 from weblate.trans.forms import (
-    get_upload_form, SearchForm, SiteSearchForm,
+    get_upload_form, get_upload_at_subproject_level_form, SearchForm, SiteSearchForm,
     AutoForm, ReviewForm, get_new_language_form,
     ReportsForm, ReplaceForm,
 )
@@ -384,6 +384,9 @@ def show_subproject(request, project, subproject):
     else:
         replace_form = None
 
+    # Get form
+    form = get_upload_at_subproject_level_form(request.user, obj)
+
     return render(
         request,
         'subproject.html',
@@ -409,6 +412,7 @@ def show_subproject(request, project, subproject):
             'source_words_count': source_words,
             'replace_form': replace_form,
             'search_form': SearchForm(),
+            'form': form,
         }
     )
 

@@ -149,6 +149,14 @@ def can_upload_translation(user, translation):
 
 
 @cache_permission
+def can_upload_translations(user, subproject):
+    """can_upload_translation check, only on the upper level (subproject)."""
+    # We kinda could test any() because the user could do a very small zip, even with a single language, 
+    # but let's convservatively go with all()
+    return all([can_upload_translation(user, translation) for translation in subproject.translation_set.all()])
+
+
+@cache_permission
 def can_translate(user, translation=None, project=None):
     """Check whether user can translate given translation."""
     if project is not None:

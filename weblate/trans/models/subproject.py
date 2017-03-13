@@ -26,6 +26,7 @@ import sys
 import time
 import fnmatch
 import re
+import zipfile
 
 from django.conf import settings
 from django.db import models, transaction
@@ -1617,6 +1618,9 @@ class SubProject(models.Model, PercentMixin, URLMixin, PathMixin):
                 action=Change.ACTION_LOCK if lock else Change.ACTION_UNLOCK,
             )
 
+    def is_locked(self, user=None):
+        return any([translation.is_locked(user) for translation in self.translation_set.all()])
+
     def get_editable_template(self):
         if not self.edit_template or not self.has_template():
             return None
@@ -1634,3 +1638,37 @@ class SubProject(models.Model, PercentMixin, URLMixin, PathMixin):
 
     def get_language_count(self):
         return self.translation_set.count()
+
+    def merge_upload(self, request, fileobj, overwrite, author=None,
+                     merge_header=True, method='translate', fuzzy='', diff_past=True, atomic_upload=False):
+        """Top level handler for file uploads at subproject level"""
+        fileobj_name_base, fileobj_name_ext = os.path.splitext(fileobj.name)
+        if fileobj_name_ext !=  '.zip':
+            raise Exception('Only zip files are accepted when uploading at component level!')
+
+        overall_not_found = 0
+        overall_skipped = 0
+        overall_accepted = 0
+        overall_total = 0
+
+        zip_file = zipfile.ZipFile(fileobj)
+        for name in zip_file.namelist():
+            name_base, name_ext = os.path.splitext(name)
+            # We know the file has been downloaded as {project}-{subproject}-{language}.{extension}
+            # Let's be strict here and expect the exact same name within the zip
+            # (for a less strict version, we could use a looser criterion e.g. if name_base.endswith('-%s' % t.language_code))
+            translation = next((t for t in self.translation_set.all() 
+                                if name_base == '{project}-{subproject}-{language}'.format(
+                                    project=self.project.slug, subproject=self.slug, language=t.language.code)),
+                               None)
+            if translation is not None:
+                zip_item_fileobj = zip_file.open(name)
+                not_found, skipped, accepted, total = translation.merge_upload(request, zip_item_fileobj, overwrite, author, 
+                                                                                merge_header, method, fuzzy, diff_past=diff_past, atomic_upload=atomic_upload)
+                overall_not_found += not_found
+                overall_skipped += skipped
+                overall_accepted += accepted
+                overall_total += total
+        fileobj.close()
+         
+        return (overall_not_found, overall_skipped, overall_accepted, overall_total)
