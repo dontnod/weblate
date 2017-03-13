@@ -29,6 +29,12 @@ def can_upload_translation(user, translation):
         user, translation
     )
 
+@register.assignment_tag
+def can_upload_translations(user, subproject):
+    return weblate.permissions.helpers.can_upload_translations(
+        user, subproject
+    )
+
 
 @register.assignment_tag
 def can_translate(user, translation):

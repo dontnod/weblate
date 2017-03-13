@@ -30,13 +30,13 @@ from django.views.decorators.http import require_POST
 
 from weblate.utils import messages
 from weblate.utils.errors import report_error
-from weblate.trans.forms import get_upload_form
+from weblate.trans.forms import get_upload_form, get_upload_at_subproject_level_form
 from weblate.trans.views.helper import (
     get_subproject, get_translation, download_translation_file, download_all_translations_file, show_form_errors,
 )
 from weblate.permissions.helpers import (
     can_author_translation, can_overwrite_translation,
-    can_upload_translation,
+    can_upload_translation, can_upload_translations
 )
 
 
@@ -73,10 +73,14 @@ def download_language_pack(request, project, subproject, lang):
 @require_POST
 def upload_translation(request, project, subproject, lang):
     """Handling of translation uploads."""
-    obj = get_translation(request, project, subproject, lang)
+    obj = get_translation(request, project, subproject, lang) if lang is not None else get_subproject(request, project, subproject)
 
-    if not can_upload_translation(request.user, obj):
-        raise PermissionDenied()
+    if lang is not None:
+        if not can_upload_translation(request.user, obj):
+            raise PermissionDenied()
+    else:
+        if not can_upload_translations(request.user, obj):
+            raise PermissionDenied()
 
     # Check method and lock
     if obj.is_locked(request.user):
@@ -85,6 +89,9 @@ def upload_translation(request, project, subproject, lang):
 
     # Get correct form handler based on permissions
     form = get_upload_form(
+        request.user, obj,
+        request.POST, request.FILES
+    ) if lang is not None else get_upload_at_subproject_level_form(
         request.user, obj,
         request.POST, request.FILES
     )
@@ -97,7 +104,7 @@ def upload_translation(request, project, subproject, lang):
 
     # Create author name
     author = None
-    if (can_author_translation(request.user, obj.subproject.project) and
+    if (can_author_translation(request.user, obj.subproject.project if lang is not None else obj.project) and
             form.cleaned_data['author_name'] != '' and
             form.cleaned_data['author_email'] != ''):
         author = '{0} <{1}>'.format(
@@ -107,7 +114,7 @@ def upload_translation(request, project, subproject, lang):
 
     # Check for overwriting
     overwrite = False
-    if can_overwrite_translation(request.user, obj.subproject.project):
+    if can_overwrite_translation(request.user, obj.subproject.project if lang is not None else obj.project):
         overwrite = form.cleaned_data['upload_overwrite']
 
     # Do actual import
@@ -124,7 +131,7 @@ def upload_translation(request, project, subproject, lang):
             atomic_upload=form.cleaned_data['atomic_upload'],
         )
         if total == 0:
-            message = _('No strings were imported from the uploaded file.')
+            message = _('No strings were imported from the uploaded file%s.' % ('' if lang is not None else 's'))
         else:
             message = ungettext(
                 'Processed {0} string from the uploaded files '
@@ -139,8 +146,12 @@ def upload_translation(request, project, subproject, lang):
             messages.success(request, message)
     except Exception as error:
         messages.error(
-            request, _('File content merge failed: %s') % force_text(error)
+            request, _('File%s content merge failed: %s') % ('' if lang is not None else 's', force_text(error))
         )
         report_error(error, sys.exc_info(), request)
 
     return redirect(obj)
+
+@require_POST
+def upload_translations(request, project, subproject):
+    return upload_translation(request, project, subproject, lang=None)

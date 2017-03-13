@@ -23,6 +23,8 @@
 {% can_view_reports user object.project as user_can_view_reports %}
 {% can_add_translation user object.project as user_can_add_translation %}
 {% can_edit_subproject user object.project as user_can_edit_subproject %}
+{% can_overwrite_translation user object.project as user_can_overwrite_translation %}
+{% can_upload_translations user object as user_can_upload_translations %}
 
 {% include "show-lock.html" %}
 
@@ -49,6 +51,10 @@
     </a>
     <ul class="dropdown-menu">
       <li><a href="{% url 'download_all_translations_format' project=object.project.slug subproject=object.slug fmt='xlsx'%}" title="{% trans " Download for an offline translation." %}">{% trans "Download translations (all languages) as Excel workbook" %}</a></li>
+      {% if user_can_upload_translations %}
+      <li role="separator" class="divider"></li>
+      <li><a href="#upload" data-toggle="tab">{% trans "Upload translations (zip)" %}</a></li>
+      {% endif %}
     </ul>
   </li>
   <li class="dropdown">
@@ -160,6 +166,29 @@
 </div>
 </div>
 </form>
+</div>
+{% endif %}
+
+{% if user_can_upload_translations %}
+<div class="tab-pane" id="upload">
+<form action="{% url 'upload_translations' project=object.project.slug subproject=object.slug %}" method="post" enctype="multipart/form-data">
+<div class="panel panel-primary">
+<div class="panel-heading"><h4 class="panel-title">{% trans "Upload" %}</h4></div>
+<div class="panel-body">
+{% if user_can_overwrite_translation %}
+<p>{% trans "Uploaded files will be merged with current translations. In case you want to overwrite already translated strings, don't forget to enable it." %}</p>
+{% else %}
+<p>{% trans "Uploaded files will be merged with current translations." %}</p>
+{% endif %}
+{% csrf_token %}
+{{ form|crispy }}
+</div>
+<div class="panel-footer">
+<input type="submit" value="{% trans "Upload" %}" class="btn btn-default" />
+</div>
+</form>
+
+</div>
 </div>
 {% endif %}
 
