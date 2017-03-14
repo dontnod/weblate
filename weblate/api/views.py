@@ -45,7 +45,7 @@ from weblate.trans.models import (
     Project, SubProject, Translation, Change, Unit, Source,
 )
 from weblate.permissions.helpers import (
-    can_upload_translation, can_upload_translations, can_lock_subproject, can_see_repository_status,
+    can_upload_translation, can_upload_translations, can_upload_translations_for_project, can_lock_subproject, can_see_repository_status,
     can_commit_translation, can_update_translation, can_reset_translation,
     can_push_translation, can_overwrite_translation, can_change_screenshot,
 )
@@ -291,6 +291,33 @@ class ProjectViewSet(WeblateViewSet):
         )
 
         return self.get_paginated_response(serializer.data)
+
+    def file(self, request, **kwargs):
+        obj = self.get_object()
+        if request.method != 'GET':
+
+            if (not can_upload_translations_for_project(request.user, obj) or
+                    obj.is_locked(request.user)):
+                raise PermissionDenied()
+
+            if 'file' not in request.data:
+                raise ParseError('Missing file parameter')
+
+            not_found, skipped, accepted, total = obj.merge_upload(
+                request,
+                request.data['file'],
+                False
+            )
+
+            return Response(data={
+                'not_found': not_found,
+                'skipped': skipped,
+                'accepted': accepted,
+                'total': total,
+                # Compatibility with older less detailed API
+                'result': accepted > 0,
+                'count': total,
+            })
 
 
 class ComponentViewSet(MultipleFieldMixin, WeblateViewSet):

@@ -30,13 +30,13 @@ from django.views.decorators.http import require_POST
 
 from weblate.utils import messages
 from weblate.utils.errors import report_error
-from weblate.trans.forms import get_upload_form, get_upload_at_subproject_level_form
+from weblate.trans.forms import get_upload_form, get_upload_at_subproject_level_form, get_upload_at_project_level_form
 from weblate.trans.views.helper import (
-    get_subproject, get_translation, download_translation_file, download_all_translations_file, show_form_errors,
+    get_project, get_subproject, get_translation, download_translation_file, download_all_translations_file, show_form_errors,
 )
 from weblate.permissions.helpers import (
     can_author_translation, can_overwrite_translation,
-    can_upload_translation, can_upload_translations
+    can_upload_translation, can_upload_translations, can_upload_translations_for_project
 )
 
 
@@ -73,13 +73,20 @@ def download_language_pack(request, project, subproject, lang):
 @require_POST
 def upload_translation(request, project, subproject, lang):
     """Handling of translation uploads."""
-    obj = get_translation(request, project, subproject, lang) if lang is not None else get_subproject(request, project, subproject)
-
-    if lang is not None:
-        if not can_upload_translation(request.user, obj):
+    if subproject is None and lang is None:
+        obj = get_project(request, project)
+        project_obj = obj
+        if not can_upload_translations_for_project(request.user, obj):
+            raise PermissionDenied()
+    elif lang is None:
+        obj = get_subproject(request, project, subproject)
+        project_obj = obj.project
+        if not can_upload_translations(request.user, obj):
             raise PermissionDenied()
     else:
-        if not can_upload_translations(request.user, obj):
+        obj = get_translation(request, project, subproject, lang)
+        project_obj = obj.subproject.project
+        if not can_upload_translation(request.user, obj):
             raise PermissionDenied()
 
     # Check method and lock
@@ -88,13 +95,21 @@ def upload_translation(request, project, subproject, lang):
         return redirect(obj)
 
     # Get correct form handler based on permissions
-    form = get_upload_form(
-        request.user, obj,
-        request.POST, request.FILES
-    ) if lang is not None else get_upload_at_subproject_level_form(
-        request.user, obj,
-        request.POST, request.FILES
-    )
+    if subproject is None and lang is None:
+        form = get_upload_at_project_level_form(
+            request.user, obj,
+            request.POST, request.FILES
+        )
+    elif lang is None:
+        form = get_upload_at_subproject_level_form(
+            request.user, obj,
+            request.POST, request.FILES
+        )
+    else:
+        form = get_upload_form(
+            request.user, obj,
+            request.POST, request.FILES
+        )
 
     # Check form validity
     if not form.is_valid():
@@ -104,7 +119,7 @@ def upload_translation(request, project, subproject, lang):
 
     # Create author name
     author = None
-    if (can_author_translation(request.user, obj.subproject.project if lang is not None else obj.project) and
+    if (can_author_translation(request.user, project_obj) and
             form.cleaned_data['author_name'] != '' and
             form.cleaned_data['author_email'] != ''):
         author = '{0} <{1}>'.format(
@@ -114,7 +129,7 @@ def upload_translation(request, project, subproject, lang):
 
     # Check for overwriting
     overwrite = False
-    if can_overwrite_translation(request.user, obj.subproject.project if lang is not None else obj.project):
+    if can_overwrite_translation(request.user, project_obj):
         overwrite = form.cleaned_data['upload_overwrite']
 
     # Do actual import
@@ -155,3 +170,7 @@ def upload_translation(request, project, subproject, lang):
 @require_POST
 def upload_translations(request, project, subproject):
     return upload_translation(request, project, subproject, lang=None)
+
+@require_POST
+def upload_translations_for_project(request, project):
+    return upload_translation(request, project, subproject=None, lang=None)
