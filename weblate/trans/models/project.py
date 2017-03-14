@@ -22,6 +22,7 @@ from __future__ import unicode_literals
 
 import os
 import os.path
+import zipfile
 
 from django.db import models
 from django.db.models import Sum
@@ -414,3 +415,46 @@ class Project(models.Model, PercentMixin, URLMixin, PathMixin):
             result.append(other)
 
         return result
+
+    def is_locked(self, user=None):
+        return any([subproject.is_locked(user) for subproject in self.subproject_set.all()])
+
+    def merge_upload(self, request, fileobj, overwrite, author=None,
+                     merge_header=True, method='translate', fuzzy='', diff_past=True, atomic_upload=False):
+        """Top level handler for file uploads at project level"""
+        fileobj_name_base, fileobj_name_ext = os.path.splitext(fileobj.name)
+        if fileobj_name_ext !=  '.zip':
+            raise Exception('Only zip files are accepted when uploading at project level!')
+
+        overall_not_found = 0
+        overall_skipped = 0
+        overall_accepted = 0
+        overall_total = 0
+
+        zip_file = zipfile.ZipFile(fileobj)
+        for name in zip_file.namelist():
+            name_base, name_ext = os.path.splitext(name)
+            # We know the file has been downloaded as {project}-{subproject}-{language}.{extension}
+            # Let's be strict here and expect the exact same name within the zip
+            
+            translation = None
+            for subproject in self.subproject_set.all():
+                translation = next((t for t in subproject.translation_set.all() 
+                                    if name_base == '{project}-{subproject}-{language}'.format(
+                                        project=self.slug, subproject=subproject.slug, language=t.language.code)),
+                                   None)
+                if translation is not None:
+                    break
+
+            if translation is not None:
+                zip_item_fileobj = zip_file.open(name)
+                not_found, skipped, accepted, total = translation.merge_upload(request, zip_item_fileobj, overwrite, author, 
+                                                                                merge_header, method, fuzzy, diff_past=diff_past, atomic_upload=atomic_upload)
+                overall_not_found += not_found
+                overall_skipped += skipped
+                overall_accepted += accepted
+                overall_total += total
+        fileobj.close()
+         
+        return (overall_not_found, overall_skipped, overall_accepted, overall_total)
+

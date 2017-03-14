@@ -228,6 +228,11 @@ urlpatterns = [
         name='upload_translations',
     ),
     url(
+        r'^upload/' + PROJECT + '$',
+        weblate.trans.views.files.upload_translations_for_project,
+        name='upload_translations_for_project',
+    ),
+    url(
         r'^auto-translate/' + TRANSLATION + '$',
         weblate.trans.views.edit.auto_translation,
         name='auto_translation',
@@ -877,6 +882,14 @@ urlpatterns = [
         r'^projects/' + SUBPROJECT + 'upload/$',
         RedirectView.as_view(
             url='/upload/%(project)s/%(subproject)s/',
+            permanent=True,
+            query_string=True
+        )
+    ),
+    url(
+        r'^projects/' + PROJECT + 'upload/$',
+        RedirectView.as_view(
+            url='/upload/%(project)s/',
             permanent=True,
             query_string=True
         )

@@ -556,6 +556,24 @@ def get_upload_at_subproject_level_form(user, subproject, *args):
         result.remove_translation_choice('suggest')
     return result
 
+def get_upload_at_project_level_form(user, project, *args):
+    '''
+    Returns correct upload form based on user permissions.
+    '''
+    if can_author_translation(user, project):
+        form = ExtraUploadForm
+    elif can_overwrite_translation(user, project):
+        form = UploadForm
+    else:
+        form = SimpleUploadForm
+    result = form(*args)
+    if any([any([not can_translate(user, translation) for translation in subproject.translation_set.all()]) for subproject in project.subproject_set.all()]):
+        result.remove_translation_choice('translate')
+        result.remove_translation_choice('fuzzy')
+    if any([any([not can_suggest(user, translation) for translation in subproject.translation_set.all()]) for subproject in project.subproject_set.all()]):
+        result.remove_translation_choice('suggest')
+    return result
+
 class FilterField(forms.ChoiceField):
     def __init__(self, *args, **kwargs):
         kwargs['label'] = _('Search filter')
