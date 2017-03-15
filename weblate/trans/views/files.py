@@ -51,6 +51,13 @@ def download_translations_format(request, project, subproject, fmt):
 
     return download_translations_file(obj.translation_set.all(), fmt)
 
+def download_translations_format_at_project_level(request, project, fmt):
+    obj = get_project(request, project)
+    all_translations = []
+    for subproject in obj.subproject_set.all():
+        all_translations.extend(subproject.translation_set.all())
+    return download_translations_file(all_translations, fmt)
+
 
 def download_translation(request, project, subproject, lang):
     obj = get_translation(request, project, subproject, lang)
@@ -61,6 +68,13 @@ def download_translations(request, project, subproject):
     obj = get_subproject(request, project, subproject)
 
     return download_translations_file(obj.translation_set.all())
+
+def download_translations_at_project_level(request, project):
+    obj = get_project(request, project)
+    all_translations = []
+    for subproject in obj.subproject_set.all():
+        all_translations.extend(subproject.translation_set.all())
+    return download_translations_file(all_translations)
 
 
 def download_language_pack(request, project, subproject, lang):
