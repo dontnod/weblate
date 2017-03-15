@@ -100,6 +100,16 @@ urlpatterns = [
         weblate.trans.views.basic.show_project,
         name='project',
     ),
+    url(
+        r'^download-translations-at-project-level/' + PROJECT + '$',
+        weblate.trans.views.files.download_translations_at_project_level,
+        name='download_translations_at_project_level',
+    ),
+    url(
+        r'^download-translations-at-project-level/' + PROJECT + '(?P<fmt>[a-z0-9]+)/$',
+        weblate.trans.views.files.download_translations_format_at_project_level,
+        name='download_translations_format_at_project_level',
+    ),
 
     # Engagement pages
     url(

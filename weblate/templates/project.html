@@ -44,6 +44,13 @@
         {% trans "Files" %} <span class="caret"></span>
     </a>
     <ul class="dropdown-menu">
+        <li><a href="{% url 'download_translations_at_project_level' project=object.slug %}" title="{% trans " Download for an offline translation." %}">{% trans "Download original translation files (all components x languages) (zip)" %}</a></li>
+        <li><a href="{% url 'download_translations_format_at_project_level' project=object.slug fmt='xlsx'%}" title="{% trans " Download for an offline translation." %}">{% trans "Download translations (all components x languages) as Excel workbooks (zip)" %}</a></li>
+        <li><a href="{% url 'download_translations_format_at_project_level' project=object.slug fmt='xliff'%}" title="{% trans " Download for an offline translation." %}">{% trans "Download translations (all components x languages) as XLIFF (zip)" %}</a></li>
+        <li><a href="{% url 'download_translations_format_at_project_level' project=object.slug fmt='xliff12'%}" title="{% trans " Download for an offline translation." %}">{% trans "Download translations (all components x languages) as XLIFF 1.2 (zip)" %}</a></li>
+        <li><a href="{% url 'download_translations_format_at_project_level' project=object.slug fmt='po'%}" title="{% trans " Download for an offline translation." %}">{% trans "Download translations (all components x languages) as Gettext PO (zip)" %}</a></li>
+        <li><a href="{% url 'download_translations_format_at_project_level' project=object.slug fmt='mo'%}" title="{% trans " Download for an offline translation." %}">{% trans "Download translations (all components x languages) as Gettext MO (zip)" %}</a></li>
+        <li><a href="{% url 'download_translations_format_at_project_level' project=object.slug fmt='csv'%}" title="{% trans " Download for an offline translation." %}">{% trans "Download translations (all components x languages) as CSV (zip)" %}</a></li>
         {% if user_can_upload_translations_for_project %}
         <li role="separator" class="divider"></li>
         <li><a href="#upload" data-toggle="tab">{% trans "Upload translations (zip)" %}</a></li>
