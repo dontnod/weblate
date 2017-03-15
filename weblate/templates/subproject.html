@@ -50,7 +50,14 @@
       {% trans "Files" %} <span class="caret"></span>
     </a>
     <ul class="dropdown-menu">
-      <li><a href="{% url 'download_all_translations_format' project=object.project.slug subproject=object.slug fmt='xlsx'%}" title="{% trans " Download for an offline translation." %}">{% trans "Download translations (all languages) as Excel workbook" %}</a></li>
+      <li><a href="{% url 'download_translations' project=object.project.slug subproject=object.slug %}" title="{% trans " Download for an offline translation." %}">{% blocktrans with object.file_format_name as format %}Download original translation files (all languages) ({{format}}) (zip){% endblocktrans %}</a></li>
+      <li><a href="{% url 'download_translations_format' project=object.project.slug subproject=object.slug fmt='xlsx'%}" title="{% trans " Download for an offline translation." %}">{% trans "Download translations (all languages) as Excel workbooks (zip)" %}</a></li>
+      <li><a href="{% url 'download_translations_format' project=object.project.slug subproject=object.slug fmt='singlexlsx'%}" title="{% trans " Download for an offline translation." %}">{% trans "Download translations (all languages) as single Excel workbook" %}</a></li>
+      <li><a href="{% url 'download_translations_format' project=object.project.slug subproject=object.slug fmt='xliff'%}" title="{% trans " Download for an offline translation." %}">{% trans "Download translations (all languages) as XLIFF (zip)" %}</a></li>
+      <li><a href="{% url 'download_translations_format' project=object.project.slug subproject=object.slug fmt='xliff12'%}" title="{% trans " Download for an offline translation." %}">{% trans "Download translations (all languages) as XLIFF 1.2 (zip)" %}</a></li>
+      <li><a href="{% url 'download_translations_format' project=object.project.slug subproject=object.slug fmt='po'%}" title="{% trans " Download for an offline translation." %}">{% trans "Download translations (all languages) as Gettext PO (zip)" %}</a></li>
+      <li><a href="{% url 'download_translations_format' project=object.project.slug subproject=object.slug fmt='mo'%}" title="{% trans " Download for an offline translation." %}">{% trans "Download translations (all languages) as Gettext MO (zip)" %}</a></li>
+      <li><a href="{% url 'download_translations_format' project=object.project.slug subproject=object.slug fmt='csv'%}" title="{% trans " Download for an offline translation." %}">{% trans "Download translations (all languages) as CSV (zip)" %}</a></li>
       {% if user_can_upload_translations %}
       <li role="separator" class="divider"></li>
       <li><a href="#upload" data-toggle="tab">{% trans "Upload translations (zip)" %}</a></li>

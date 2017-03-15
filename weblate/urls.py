@@ -182,9 +182,14 @@ urlpatterns = [
         name='edit_check_flags'
     ),
     url(
+        r'^download-translations/' + SUBPROJECT + '$',
+        weblate.trans.views.files.download_translations,
+        name='download_translations',
+    ),
+    url(
         r'^download-translations/' + SUBPROJECT + '(?P<fmt>[a-z0-9]+)/$',
-        weblate.trans.views.files.download_all_translations_format,
-        name='download_all_translations_format',
+        weblate.trans.views.files.download_translations_format,
+        name='download_translations_format',
     ),
 
     # Translation pages
