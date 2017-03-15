@@ -133,22 +133,26 @@ class BaseExporter(object):
             output.markfuzzy(True)
         self.storage.addunit(output)
 
-    def get_response(self, filetemplate='{project}-{language}.{extension}'):
-        filename = filetemplate.format(
+    def get_response_filename(self, filetemplate='{project}-{language}.{extension}'):
+        return filetemplate.format(
             project=self.project.slug,
             language=self.language.code,
             extension=self.extension
         )
 
+    def get_content_type(self):
+        return '{0}; charset=utf-8'.format(self.content_type)
+
+    def get_response(self, filetemplate='{project}-{language}.{extension}'):
         response = HttpResponse(
-            content_type='{0}; charset=utf-8'.format(self.content_type)
+            content_type=self.get_content_type()
         )
         response['Content-Disposition'] = 'attachment; filename={0}'.format(
-            filename
+            self.get_response_filename(filetemplate)
         )
 
         # Save to response
-        response.write(FileFormat.serialize(self.storage))
+        response.write(self.serialize())
 
         return response
 

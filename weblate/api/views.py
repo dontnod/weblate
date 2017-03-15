@@ -52,7 +52,7 @@ from weblate.permissions.helpers import (
 from weblate.trans.stats import get_project_stats
 from weblate.lang.models import Language
 from weblate.screenshots.models import Screenshot
-from weblate.trans.views.helper import download_translation_file, download_all_translations_file
+from weblate.trans.views.helper import download_translation_file, download_translations_file
 from weblate import get_doc_url
 
 REPO_OPERATIONS = {
@@ -454,7 +454,7 @@ class ComponentViewSet(MultipleFieldMixin, WeblateViewSet):
         obj = self.get_object()
         if request.method == 'GET':
             fmt = self.format_kwarg or request.query_params.get('format')
-            return download_all_translations_file(obj.translation_set.all(), fmt)
+            return download_translations_file(obj.translation_set.all(), fmt)
 
 
 class TranslationViewSet(MultipleFieldMixin, WeblateViewSet):

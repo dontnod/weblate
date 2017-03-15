@@ -20,6 +20,12 @@
 """Helper methods for views."""
 
 import os
+import zipfile
+try:
+    import zlib
+    compression = zipfile.ZIP_DEFLATED
+except:
+    compression = zipfile.ZIP_STORED
 
 from django.http import HttpResponse, Http404
 from django.shortcuts import get_object_or_404
@@ -113,6 +119,19 @@ def import_message(request, count, message_none, message_ok):
 
 
 def download_translation_file(translation, fmt=None):
+    data_name, content_type, data = get_translation_file_data(translation, fmt)
+
+    response = HttpResponse(
+        data,
+        content_type=content_type
+    )
+    response['Content-Disposition'] = 'attachment; filename={0}'.format(
+        data_name
+    )
+
+    return response
+
+def get_translation_file_data(translation, fmt=None):
     # It's ugly as hell, but for now I'll handle "Download as Excel workbook" 
     # very differently from the other (translate-toolkit-based) exports
     if fmt == 'xlsx':
@@ -128,11 +147,9 @@ def download_translation_file(translation, fmt=None):
             raise Http404('File format not supported')
         if fmt != 'xlsx':
             exporter.add_units(translation)
-            return exporter.get_response(
-                '{{project}}-{0}-{{language}}.{{extension}}'.format(
-                    translation.subproject.slug
-                )
-            )
+            return (exporter.get_response_filename('{{project}}-{0}-{{language}}.{{extension}}'.format(translation.subproject.slug)), 
+                    exporter.get_content_type(),
+                    exporter.serialize())
 
     srcfilename = translation.get_filename()
 
@@ -140,31 +157,22 @@ def download_translation_file(translation, fmt=None):
         originalsrcfilename = srcfilename
         srcfilename = exporter.export(originalsrcfilename, translation.get_last_local_commit(commit_pending=True))
 
-    # Construct file name (do not use real filename as it is usually not
-    # that useful)
-    filename = '{0}-{1}-{2}.{3}'.format(
+    with open(srcfilename) as handle:
+        data = handle.read()
+
+    if fmt == 'xlsx':
+        os.remove(srcfilename)
+
+    data_name = '{0}-{1}-{2}.{3}'.format(
         translation.subproject.project.slug,
         translation.subproject.slug,
         translation.language.code,
         'xlsx' if fmt == 'xlsx' else translation.store.extension 
     )
 
-    # Create response
-    with open(srcfilename) as handle:
-        response = HttpResponse(
-            handle.read(),
-            content_type = exporter.content_type if fmt == 'xlsx' else translation.store.mimetype
-        )
+    content_type = exporter.content_type if fmt == 'xlsx' else translation.store.mimetype
 
-    if fmt == 'xlsx':
-        os.remove(srcfilename)
-
-    # Fill in response headers
-    response['Content-Disposition'] = 'attachment; filename={0}'.format(
-        filename
-    )
-
-    return response
+    return (data_name, content_type, data)
 
 
 def show_form_errors(request, form):
@@ -181,12 +189,49 @@ def show_form_errors(request, form):
                 }
             )
 
+def download_translations_file(translations, fmt=None):
+    level = 'subproject'
+    subproject = None
+    for translation in translations:
+        if subproject is None:
+            subproject = translation.subproject
+        elif translation.subproject != subproject:
+            level = 'project'
+            break
 
-def download_all_translations_file(translations, fmt=None):
-    # Slightly modified version of download_translation_file
-    # For now it only supports multiple original .po => single .xlsx
-    assert fmt == 'xlsx'
+    if fmt == 'singlexlsx':
+        data_name, content_type, data = get_translations_as_single_xlsx_file_data(translations)
+    else:
+        zipfilename = '{0}-all.zip'.format('{0}-{1}'.format(translation.subproject.project.slug, translation.subproject.slug) if level == 'subproject' else translation.subproject.project.slug)
+        abs_zipfilename = os.path.join(translation.subproject.get_path(), zipfilename)
+        zf = zipfile.ZipFile(abs_zipfilename, mode='w', compression=compression)
+        
+        try:
+            for translation in translations:
+                data_name, _, data = get_translation_file_data(translation, fmt)
+                zf.writestr(data_name, data)
+        finally:
+            zf.close()
+        
+        with open(abs_zipfilename) as handle:
+            data = handle.read()
 
+        os.remove(abs_zipfilename)
+
+        data_name = zipfilename
+        content_type = 'application/zip'
+
+    response = HttpResponse(
+        data,
+        content_type=content_type
+    )
+    response['Content-Disposition'] = 'attachment; filename={0}'.format(
+        data_name
+    )
+
+    return response
+
+def get_translations_as_single_xlsx_file_data(translations):
     for translation in translations:
         subproject = translation.subproject 
         # should be the same for all translations!
@@ -195,7 +240,7 @@ def download_all_translations_file(translations, fmt=None):
     for translation in translations:
         if translation.store.extension != 'po':
             raise Http404('Download as Excel workbook is only available when original file is a Gettext PO file!')
-    exporter = get_exporter(fmt)()
+    exporter = get_exporter('xlsx')()
 
     originalsrcfilenames = []
     for translation in translations:
@@ -212,14 +257,8 @@ def download_all_translations_file(translations, fmt=None):
 
     # Create response
     with open(srcfilename) as handle:
-        response = HttpResponse(
-            handle.read(),
-            content_type = exporter.content_type
-        )
+        data = handle.read(),
 
     os.remove(srcfilename)
 
-    # Fill in response headers
-    response['Content-Disposition'] = 'attachment; filename=%s' % filename
-
-    return response
+    return (filename, exporter.content_type, data)

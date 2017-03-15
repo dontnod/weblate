@@ -32,7 +32,7 @@ from weblate.utils import messages
 from weblate.utils.errors import report_error
 from weblate.trans.forms import get_upload_form, get_upload_at_subproject_level_form, get_upload_at_project_level_form
 from weblate.trans.views.helper import (
-    get_project, get_subproject, get_translation, download_translation_file, download_all_translations_file, show_form_errors,
+    get_project, get_subproject, get_translation, download_translation_file, download_translations_file, show_form_errors,
 )
 from weblate.permissions.helpers import (
     can_author_translation, can_overwrite_translation,
@@ -46,16 +46,21 @@ def download_translation_format(request, project, subproject, lang, fmt):
     return download_translation_file(obj, fmt)
 
 
-def download_all_translations_format(request, project, subproject, fmt):
+def download_translations_format(request, project, subproject, fmt):
     obj = get_subproject(request, project, subproject)
 
-    return download_all_translations_file(obj.translation_set.all(), fmt)
+    return download_translations_file(obj.translation_set.all(), fmt)
 
 
 def download_translation(request, project, subproject, lang):
     obj = get_translation(request, project, subproject, lang)
 
     return download_translation_file(obj)
+
+def download_translations(request, project, subproject):
+    obj = get_subproject(request, project, subproject)
+
+    return download_translations_file(obj.translation_set.all())
 
 
 def download_language_pack(request, project, subproject, lang):
