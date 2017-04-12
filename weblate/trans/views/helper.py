@@ -189,21 +189,18 @@ def show_form_errors(request, form):
                 }
             )
 
-def download_translations_file(translations, fmt=None):
-    level = 'subproject'
-    subproject = None
-    for translation in translations:
-        if subproject is None:
-            subproject = translation.subproject
-        elif translation.subproject != subproject:
-            level = 'project'
-            break
-
+def download_translations_file(translations, fmt=None, level='subproject'):
+    
     if fmt == 'singlexlsx':
         data_name, content_type, data = get_translations_as_single_xlsx_file_data(translations)
     else:
-        zipfilename = '{0}-all.zip'.format('{0}-{1}'.format(translation.subproject.project.slug, translation.subproject.slug) if level == 'subproject' else translation.subproject.project.slug)
-        abs_zipfilename = os.path.join(translation.subproject.get_path(), zipfilename)
+        if level=='project':
+            zipfilename = '{0}-all.zip'.format(translations[0].subproject.project.slug)
+        elif level=='project_lang':
+            zipfilename = '{0}-{1}-all.zip'.format(translations[0].subproject.project.slug, translations[0].language.code)
+        elif level=='subproject':
+            zipfilename = '{0}-{1}-all.zip'.format(translations[0].subproject.project.slug, translations[0].subproject.slug)
+        abs_zipfilename = os.path.join(translations[0].subproject.get_path(), zipfilename)
         zf = zipfile.ZipFile(abs_zipfilename, mode='w', compression=compression)
         
         try:

@@ -49,14 +49,21 @@ def download_translation_format(request, project, subproject, lang, fmt):
 def download_translations_format(request, project, subproject, fmt):
     obj = get_subproject(request, project, subproject)
 
-    return download_translations_file(obj.translation_set.all(), fmt)
+    return download_translations_file(obj.translation_set.all(), fmt, level='subproject')
 
 def download_translations_format_at_project_level(request, project, fmt):
     obj = get_project(request, project)
     all_translations = []
     for subproject in obj.subproject_set.all():
         all_translations.extend(subproject.translation_set.all())
-    return download_translations_file(all_translations, fmt)
+    return download_translations_file(all_translations, fmt, level='project')
+
+def download_translations_format_at_project_lang_level(request, project, lang, fmt):
+    obj = get_project(request, project)
+    all_translations = []
+    for subproject in obj.subproject_set.all():
+        all_translations.append(next((t for t in subproject.translation_set.all() if lang == t.language.code), None))
+    return download_translations_file(all_translations, fmt, level='project_lang')
 
 
 def download_translation(request, project, subproject, lang):
@@ -67,14 +74,21 @@ def download_translation(request, project, subproject, lang):
 def download_translations(request, project, subproject):
     obj = get_subproject(request, project, subproject)
 
-    return download_translations_file(obj.translation_set.all())
+    return download_translations_file(obj.translation_set.all(), level='subproject')
 
 def download_translations_at_project_level(request, project):
     obj = get_project(request, project)
     all_translations = []
     for subproject in obj.subproject_set.all():
         all_translations.extend(subproject.translation_set.all())
-    return download_translations_file(all_translations)
+    return download_translations_file(all_translations, level='project')
+
+def download_translations_at_project_lang_level(request, project, lang):
+    obj = get_project(request, project)
+    all_translations = []
+    for subproject in obj.subproject_set.all():
+        all_translations.append(next((t for t in subproject.translation_set.all() if lang == t.language.code), None))
+    return download_translations_file(all_translations, level='project_lang')
 
 
 def download_language_pack(request, project, subproject, lang):

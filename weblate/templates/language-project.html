@@ -18,6 +18,20 @@
   <li><a href="#activity" data-toggle="tab" data-load="activity" data-yearly="{% url 'yearly_activity' lang=language.code project=project.slug %}" data-monthly="{% url 'monthly_activity' lang=language.code project=project.slug %}">{% trans "Activity" %}</a></li>
   <li class="dropdown">
     <a class="dropdown-toggle" data-toggle="dropdown" href="#">
+      {% trans "Files" %} <span class="caret"></span>
+    </a>
+    <ul class="dropdown-menu">
+      <li><a href="{% url 'download_translations_at_project_lang_level' project=project.slug lang=language.code %}" title="{% trans " Download for an offline translation." %}">{% trans "Download original translation files (all components) (zip)" %}</a></li>
+      <li><a href="{% url 'download_translations_format_at_project_lang_level' project=project.slug lang=language.code fmt='xlsx'%}" title="{% trans " Download for an offline translation." %}">{% trans "Download translations (all components) as Excel workbooks (zip)" %}</a></li>
+      <li><a href="{% url 'download_translations_format_at_project_lang_level' project=project.slug lang=language.code fmt='xliff'%}" title="{% trans " Download for an offline translation." %}">{% trans "Download translations (all components) as XLIFF (zip)" %}</a></li>
+      <li><a href="{% url 'download_translations_format_at_project_lang_level' project=project.slug lang=language.code fmt='xliff12'%}" title="{% trans " Download for an offline translation." %}">{% trans "Download translations (all components) as XLIFF 1.2 (zip)" %}</a></li>
+      <li><a href="{% url 'download_translations_format_at_project_lang_level' project=project.slug lang=language.code fmt='po'%}" title="{% trans " Download for an offline translation." %}">{% trans "Download translations (all components) as Gettext PO (zip)" %}</a></li>
+      <li><a href="{% url 'download_translations_format_at_project_lang_level' project=project.slug lang=language.code fmt='mo'%}" title="{% trans " Download for an offline translation." %}">{% trans "Download translations (all components) as Gettext MO (zip)" %}</a></li>
+      <li><a href="{% url 'download_translations_format_at_project_lang_level' project=project.slug lang=language.code fmt='csv'%}" title="{% trans " Download for an offline translation." %}">{% trans "Download translations (all components) as CSV (zip)" %}</a></li>
+    </ul>
+  </li>
+  <li class="dropdown">
+    <a class="dropdown-toggle" data-toggle="dropdown" href="#">
       {% trans "Tools" %} <span class="caret"></span>
     </a>
     <ul class="dropdown-menu">
