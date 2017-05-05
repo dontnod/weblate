@@ -1050,6 +1050,10 @@ class Translation(models.Model, URLMixin, PercentMixin, LoggerMixin):
 
         return result
 
+    def log_upload_event(self, msg, ttunit):
+        self.log_warning('uploading: %s: context: "%s" ; source: "%s" (so we\'re NOT uploading the target: "%s")', 
+                         msg, ttunit.get_context(), ttunit.get_source(), ttunit.get_target())
+
     def merge_translations(self, request, store2, overwrite, add_fuzzy,
                            fuzzy, merge_header, old_store=None):
         """Merge translation unit wise
@@ -1069,10 +1073,12 @@ class Translation(models.Model, URLMixin, PercentMixin, LoggerMixin):
             try:
                 unit = self.unit_set.get_unit(unit2)
             except Unit.DoesNotExist:
+                self.log_upload_event('not found', unit2)
                 not_found += 1
                 continue
 
             if unit.translated and not overwrite:
+                self.log_upload_event('skipped (because already translated and overwrite flag not set)', unit2)
                 skipped += 1
                 continue
 
