@@ -464,7 +464,8 @@ class SimpleUploadForm(forms.Form):
             ('process', _('Import as string needing review')),
             ('approve', _('Import as translated')),
         ),
-        required=False
+        required=False,
+        initial='process',
     )
     merge_header = forms.BooleanField(
         label=_('Merge file header'),
