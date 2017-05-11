@@ -797,7 +797,7 @@ class FileFormat(object):
             # Skip when translation unchanged w/r/t old store
             if old_store is not None:
                 old_unit, dummy = old_store.find_unit(unit.unit.getcontext(), unit.unit.source) 
-                if old_unit is not None and old_unit.unit.target == unit.unit.target:
+                if old_unit is not None and old_unit.unit.target == unit.unit.target and (old_unit.is_fuzzy() == set_fuzzy):
                     continue
 
             yield set_fuzzy, unit
