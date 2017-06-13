@@ -130,8 +130,9 @@ class PoToXlsxExporter(object):
         # Assumption though here: first language MUST be en and we have this weird situation where we
         # try to write a multi-lang. xlsx but actually en po and foreign po have a different set of (id, ctxt)
         # due to the en tweaks becoming "sources" for foreign pos... so it's a quite messy multi-lang. xlsx anyway
-        workbook_writing_instructions['data_line_dictionary'] = {}
-        workbook_writing_instructions['data_line_dictionary_tweak_sources'] = {} # useful in case of "fresh" en tweaks
+        workbook_writing_instructions['data_line_dictionary'] = {}            # (context + source => line number)
+        workbook_writing_instructions['data_line_dictionary_2nd_chance'] = {} # (context + original source => line number) (useful in case of "fresh" en tweaks)
+        workbook_writing_instructions['data_line_dictionary_3rd_chance'] = {} # (context => line number) (as we know context is pretty much an id for us) (useful in case of "fresh" en tweaks alterations)
         trans_column_titles = PoToXlsxExporter.get_trans_column_titles(po_data)
         # data sheet
         dws = wb.active
@@ -283,9 +284,13 @@ class PoToXlsxExporter(object):
             workbook_writing_instructions['data_line_dictionary'][(po_entry.msgctxt, tweaked_msgid)].update(set([real_i]))
             if po_entry.msgstr != '':
                 # this tweak might be "fresh" i.e. not yet propagated as source for foreign languages
-                if (po_entry.msgctxt, po_entry.msgid) not in workbook_writing_instructions['data_line_dictionary_tweak_sources']:
-                    workbook_writing_instructions['data_line_dictionary_tweak_sources'][(po_entry.msgctxt, po_entry.msgid)] = set()
-                workbook_writing_instructions['data_line_dictionary_tweak_sources'][(po_entry.msgctxt, po_entry.msgid)].update(set([real_i]))
+                if (po_entry.msgctxt, po_entry.msgid) not in workbook_writing_instructions['data_line_dictionary_2nd_chance']:
+                    workbook_writing_instructions['data_line_dictionary_2nd_chance'][(po_entry.msgctxt, po_entry.msgid)] = set()
+                workbook_writing_instructions['data_line_dictionary_2nd_chance'][(po_entry.msgctxt, po_entry.msgid)].update(set([real_i]))
+            # when everything else fails, we can try to rely on msgctxt alone:
+            if po_entry.msgctxt not in workbook_writing_instructions['data_line_dictionary_3rd_chance']:
+                workbook_writing_instructions['data_line_dictionary_3rd_chance'][po_entry.msgctxt] = set()
+            workbook_writing_instructions['data_line_dictionary_3rd_chance'][po_entry.msgctxt].update(set([real_i]))
         PoToXlsxExporter.inject_value('', 'Translator Comment', po_entry.tcomment, ws, real_i, column_map)
         PoToXlsxExporter.inject_value('', 'Occurrences', _format_occurrences(po_entry.occurrences), ws, real_i, column_map)
         PoToXlsxExporter.inject_value('', 'Flags', _format_flags(po_entry.flags), ws, real_i, column_map)
@@ -304,10 +309,26 @@ class PoToXlsxExporter(object):
         column_map = workbook_writing_instructions[ws.title]['column_map']
         try:
             set_real_i = workbook_writing_instructions['data_line_dictionary'][(po_entry.msgctxt, po_entry.msgid)]
+            tryNext = False
         except KeyError:
-            set_real_i = workbook_writing_instructions['data_line_dictionary_tweak_sources'][(po_entry.msgctxt, po_entry.msgid)]
-        for real_i in set_real_i:
-            PoToXlsxExporter.inject_value('', trans_column_title, po_entry.msgstr, ws, real_i, column_map)
+            tryNext = True
+        if tryNext:
+            try:
+                set_real_i = workbook_writing_instructions['data_line_dictionary_2nd_chance'][(po_entry.msgctxt, po_entry.msgid)]
+                tryNext = False
+            except KeyError:
+                tryNext = True
+        if tryNext:
+            try:
+                set_real_i = workbook_writing_instructions['data_line_dictionary_3rd_chance'][po_entry.msgctxt]
+                tryNext = False
+            except KeyError:
+                tryNext = True
+        if tryNext:
+            pass # TODO: log that we're having difficulties building the multiple lang xlsx
+        else:
+            for real_i in set_real_i:
+                PoToXlsxExporter.inject_value('', trans_column_title, po_entry.msgstr, ws, real_i, column_map)
 
     @staticmethod
     def parse_workbook(wb, simple_mode, alt_translation_column_name=None):
