@@ -698,7 +698,7 @@ class SearchForm(BaseSearchForm):
     context = forms.BooleanField(
         label=_('Search in context strings'),
         required=False,
-        initial=False
+        initial=True
     )
     location = forms.BooleanField(
         label=_('Search in location strings'),
