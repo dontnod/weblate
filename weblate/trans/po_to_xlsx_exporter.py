@@ -222,7 +222,12 @@ class PoToXlsxExporter(object):
         # Additional data with a value:
         p = re.compile(r'^\[AdditionalData\] (?P<key>[^:]*): (?P<value>[^\n]+)$', re.MULTILINE)
         for m in re.finditer(p, comment):
-            dict[m.group('key')] = m.group('value')
+            val = m.group('value')
+            try:
+                val = int(val) # Definitely makes life easier in Excel, albeit with a slight (and w/o consequence in the pipe!) data loss (e.g. "017" => 17)
+            except ValueError:
+                pass
+            dict[m.group('key')] = val
         return dict
 
     @staticmethod
