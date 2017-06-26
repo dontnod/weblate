@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% load i18n %}
+{% load static %}
 {% load translations %}
 {% load permissions %}
 {% load crispy_forms_tags %}
@@ -223,7 +224,8 @@
 
 <div class="tab-pane" id="search">
 
-<form action="{% url 'search' project=object.slug %}" method="GET">
+<script src="{% static 'js/form-local-storage.js' %}" type="text/javascript"></script>
+<form action="{% url 'search' project=object.slug %}" method="GET" class="searchform">
 {{ search_form|crispy }}
 <input type="submit" value="{% trans "Search" %}" class="btn btn-default" />
 </form>
