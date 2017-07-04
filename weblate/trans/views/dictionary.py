@@ -229,7 +229,7 @@ def download_dictionary(request, project, lang):
             'show_dictionary',
             kwargs={'project': prj.slug, 'lang': lang.code}
         )),
-        fieldnames=('source', 'target', 'description'),
+        fieldnames=('source', 'target', 'translator_comments'),
     )
 
     # Add words
