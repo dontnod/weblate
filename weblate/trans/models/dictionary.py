@@ -22,8 +22,6 @@ from __future__ import unicode_literals
 
 import functools
 import re
-import csv
-import os
 import sys
 
 from django.core.urlresolvers import reverse
@@ -51,36 +49,15 @@ class DictionaryManager(models.Manager):
 
     def upload(self, request, project, language, fileobj, method):
         """Handle dictionary upload."""
-        # NB: just as the glossary csv export is manual and eschews ttkit,
-        # here we do something specific for the csv import
         from weblate.trans.models.change import Change
-        uploaded_words = []
-        ret = 0
-        fileobj_name_base, fileobj_name_ext = os.path.splitext(fileobj.name)
-        if fileobj_name_ext == '.csv':
-            reader = csv.reader(fileobj)
-            is_header_row = True
-            columns = {}
-            for row in reader:
-                if is_header_row:
-                    i = 0
-                    for cell in row:
-                        columns[cell] = i
-                        i += 1
-                    is_header_row = False
-                else:
-                    uploaded_words.append({'source': row[columns['source']], 'target': row[columns['target']], 'description': row[columns['description']]})
-        else:
-            store = AutoFormat.parse(fileobj)
-            # process all units
-            for dummy, unit in store.iterate_merge(False):
-                uploaded_words.append({'source': unit.get_source(), 'target': unit.get_target(), 'description': ''})
+        store = AutoFormat.parse(fileobj)
 
-        # process all words
-        for word in uploaded_words:
-            source = word['source']
-            target = word['target']
-            description = word['description']
+        ret = 0
+        # process all units
+        for dummy, unit in store.iterate_merge(False):
+            source = unit.get_source()
+            target = unit.get_target()
+            description = unit.get_comments()
 
             # Ignore too long words
             if len(source) > 190 or len(target) > 190:
@@ -141,7 +118,7 @@ class DictionaryManager(models.Manager):
             action=action,
             dictionary=created,
             user=user,
-            target=str(created),
+            target=created.target,
         )
         return created
 
