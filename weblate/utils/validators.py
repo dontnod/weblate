@@ -59,13 +59,11 @@ FORBIDDEN_EXTENSIONS = frozenset((
     '.rtf',
     '.xls',
     '.docx',
-    '.xlsx',
     '.html',
     '.py',
     '.js',
     '.exe',
     '.dll',
-    '.zip',
 ))
 
 
