@@ -64,7 +64,6 @@ FORBIDDEN_EXTENSIONS = frozenset((
     '.js',
     '.exe',
     '.dll',
-    '.zip',
 ))
 
 
