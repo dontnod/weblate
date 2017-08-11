@@ -1071,7 +1071,7 @@ class Translation(models.Model, URLMixin, PercentMixin, LoggerMixin):
 
         for set_fuzzy, unit2 in store2.iterate_merge(fuzzy, old_store):
             try:
-                unit = self.unit_set.get_unit(unit2)
+                unit, smart_fuzzy, smart_previous_source = self.unit_set.get_unit(unit2, context_as_id=True)
             except Unit.DoesNotExist:
                 self.log_upload_event('not found', unit2)
                 not_found += 1
@@ -1093,7 +1093,8 @@ class Translation(models.Model, URLMixin, PercentMixin, LoggerMixin):
             unit.translate(
                 request,
                 split_plural(unit2.get_target()),
-                add_fuzzy or set_fuzzy,
+                add_fuzzy or set_fuzzy or smart_fuzzy,
+                new_previous_source=(smart_previous_source if smart_fuzzy else None),
                 change_action=Change.ACTION_UPLOAD,
                 propagate=False
             )

@@ -325,10 +325,11 @@ class UnitQuerySet(models.QuerySet):
             )
         return result
 
-    def get_unit(self, ttunit):
+    def get_unit(self, ttunit, context_as_id=False):
         """Find unit matching translate-toolkit unit
 
         This is used for import, so kind of fuzzy matching is expected.
+        NB: having context as ID offers looser/alternate matching
         """
         source = ttunit.get_source()
         context = ttunit.get_context()
@@ -336,10 +337,16 @@ class UnitQuerySet(models.QuerySet):
         params = [{'source': source, 'context': context}, {'source': source}]
         if context != '':
             params.insert(1, {'source': source, 'context': ''})
+        if context_as_id:
+            params.insert(1, {'context': context})
 
         for param in params:
             try:
-                return self.get(**param)
+                 result = self.get(**param)
+                 if context_as_id:
+                     return result, source != result.source, source
+                 else:
+                     return result
             except (Unit.DoesNotExist, Unit.MultipleObjectsReturned):
                 continue
 
@@ -1014,11 +1021,13 @@ class Unit(models.Model, LoggerMixin):
         )
 
     def translate(self, request, new_target, new_fuzzy, change_action=None,
-                  propagate=True):
+                  propagate=True, new_previous_source=None):
         """Store new translation of a unit."""
         # Update unit and save it
         self.target = join_plural(new_target)
         self.fuzzy = new_fuzzy
+        if new_previous_source is not None:
+            self.previous_source = new_previous_source
         saved = self.save_backend(
             request,
             change_action=change_action,
