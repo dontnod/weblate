@@ -238,6 +238,19 @@ class PluralTextarea(forms.Textarea):
             )
         )
 
+        # Insert time marker
+        groups.append(
+            GROUP_TEMPLATE.format(
+                '',
+                BUTTON_TEMPLATE.format(
+                    'insert-time-marker',
+                    ugettext('Insert time marker'),
+                    '',
+                    '[|]'
+                )
+            )
+        )
+
         # Special chars
         chars = [
             BUTTON_TEMPLATE.format(

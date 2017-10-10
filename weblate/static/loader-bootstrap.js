@@ -218,6 +218,14 @@ function initEditor() {
         e.preventDefault();
     });
 
+    /* Insert time marker */
+    $('.insert-time-marker').click(function (e) {
+        var $this = $(this);
+        $this.parents('.translation-item').find('.translation-editor').insertAtCaret('[|]');
+        autosize.update($('.translation-editor'));
+        e.preventDefault();
+    });
+
     /* Direction toggling */
     $('.direction-toggle').change(function () {
         var $this = $(this);
